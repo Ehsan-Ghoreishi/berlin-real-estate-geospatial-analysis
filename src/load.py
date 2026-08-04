@@ -1,16 +1,13 @@
 """
 load.py
 =======
-Load stage: persist the cleaned, feature-engineered listings into a
-SQLite database (data/processed/berlin_real_estate.db, table `listings`).
-
-SQLite (rather than SpatiaLite) is used deliberately for portability --
-it requires no extra native extension and opens with the stdlib
-sqlite3 module or any SQL browser. Geometry is kept as plain lat/lon
-columns (already present) rather than a WKB blob, which is sufficient
-for this project's read patterns (filter/aggregate by bezirk, join to
-price). The GeoPackage produced by transform.py remains the
-authoritative geospatial artifact if true GIS queries are ever needed.
+Loads all cleaned tables into a single SQLite database
+(data/processed/berlin_real_estate.db):
+  - sales             (secondary market, 49k rows)
+  - rentals           (29.4k rows)
+  - new_construction  (9.8k rows)
+  - kiez_monthly      (82 Ortsteile x 76 months time series)
+  - stations          (135 real transit stations)
 """
 
 import sqlite3
@@ -21,29 +18,36 @@ import pandas as pd
 PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 DB_PATH = PROC_DIR / "berlin_real_estate.db"
 
+TABLES = {
+    "sales": "sales_clean.csv",
+    "rentals": "rentals_clean.csv",
+    "new_construction": "new_construction_clean.csv",
+    "kiez_monthly": "kiez_monthly_clean.csv",
+    "stations": "stations_clean.csv",
+}
+
 
 def run():
-    csv_path = PROC_DIR / "listings_clean.csv"
-    df = pd.read_csv(csv_path)
-
     conn = sqlite3.connect(DB_PATH)
-    df.to_sql("listings", conn, if_exists="replace", index=False)
 
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_bezirk ON listings(bezirk)")
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_station ON listings(nearest_station)"
-    )
+    for table, fname in TABLES.items():
+        df = pd.read_csv(PROC_DIR / fname)
+        df.to_sql(table, conn, if_exists="replace", index=False)
+        print(f"[load] {table:18s} {len(df):>7,} rows -> {DB_PATH.name}")
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sales_bezirk ON sales(bezirk)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rentals_bezirk ON rentals(bezirk)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_kiez_ortsteil ON kiez_monthly(ortsteil)")
     conn.commit()
 
-    # sanity query
     check = pd.read_sql(
-        "SELECT bezirk, COUNT(*) AS n, ROUND(AVG(price_per_sqm),0) AS avg_eur_sqm "
-        "FROM listings GROUP BY bezirk ORDER BY avg_eur_sqm DESC",
+        "SELECT bezirk, COUNT(*) AS n, ROUND(AVG(price_per_m2_eur),0) AS avg_eur_m2 "
+        "FROM sales GROUP BY bezirk ORDER BY avg_eur_m2 DESC",
         conn,
     )
     conn.close()
 
-    print(f"[load] wrote {len(df)} rows -> {DB_PATH}")
+    print(f"\n[load] wrote -> {DB_PATH}")
     print(check.to_string(index=False))
     return DB_PATH
 

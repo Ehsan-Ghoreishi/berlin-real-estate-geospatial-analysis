@@ -1,14 +1,14 @@
 [
   {
     "model": "LinearRegression",
-    "rmse_eur": 39576.0,
-    "mae_eur": 29040.0,
-    "r2": 0.9129
+    "rmse_eur": 99186.0,
+    "mae_eur": 68061.0,
+    "r2": 0.8201
   },
   {
     "model": "RandomForest",
-    "rmse_eur": 41377.0,
-    "mae_eur": 28592.0,
-    "r2": 0.9047
+    "rmse_eur": 77081.0,
+    "mae_eur": 49908.0,
+    "r2": 0.8914
   }
 ]

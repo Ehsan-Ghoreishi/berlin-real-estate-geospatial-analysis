@@ -1,123 +1,143 @@
-# Berlin Real Estate — Spatial ETL & Price Prediction
+# Berlin Real Estate — Policy-Shock ETL, Geospatial ML & Price Prediction
 
-An end-to-end ETL pipeline and geospatial analysis of Berlin residential
-listings: raw data → cleaning → spatial feature engineering → SQL storage →
-price prediction → interactive map.
+An end-to-end ETL pipeline and geospatial/time-series analysis of the Berlin
+housing market (2020–2026): raw data → cleaning → geospatial feature
+engineering → SQL storage → price prediction → policy-shock timeline →
+interactive map.
 
+![policy shock timeline](maps/policy_shock_timeline.png)
 ![static map](maps/berlin_prices_static.png)
 
 ## Pipeline
 
 ```
-extract.py  →  transform.py  →  load.py  →  model.py  →  visualize.py
- (raw CSVs)     (GeoPandas,       (SQLite)    (Linear/RF    (Folium +
-                geopy distance)               regression)   Matplotlib)
+extract → transform → load → model → policy_analysis → visualize
 ```
-
-Run the whole thing:
 
 ```bash
 pip install -r requirements.txt
 python3 main.py
 ```
 
-Outputs land in `data/raw/`, `data/processed/`, and `maps/`.
+Outputs land in `data/processed/` and `maps/`. Full run takes ~40s on
+~89,000 combined listings.
+
+## Dataset
+
+**Source**: ["Berlin Real Estate: Sales, New Construction & Rentals
+(2020–2026)"](https://www.kaggle.com/) by Sergey Nefedov, downloaded from
+Kaggle. ~96,000 rows across 5 files, ~20 MB.
+
+**What's real vs. generated** (per the dataset's own documentation — stated
+here because every claim in this project needs to survive an interview
+question):
+
+| Real | Generated |
+|---|---|
+| 82 Ortsteil centroids (OpenStreetMap admin boundaries) | Individual listing characteristics (rooms, floor, exact price) |
+| 135 transit station coordinates (OSM / BVG / S-Bahn Berlin GmbH) | via a hedonic pricing model anchored to real EUR/m² medians |
+| ECB main refinancing rate timeline, 2020–2026 | |
+| German mortgage rate trajectory | |
+| Real dates of Berlin housing-policy shocks (Mietendeckel, Heizungsgesetz, etc.) | |
+| Real EUR/m² price *levels* per Ortsteil (anchored to ImmoScout24 / Engel & Völkers / Wertgutachten medians) | |
+
+The dataset author chose this hybrid approach deliberately over scraping
+ImmoScout24/Immowelt directly, which violates those platforms' ToS. This is
+a materially stronger foundation than a fully synthetic dataset — the
+geography, the macro shocks, and the price *levels* are real — but the
+individual `price_eur` of any single row is model-generated, not an actual
+transaction. **Say this plainly if asked in an interview.**
 
 ## What each stage does
 
 | Stage | File | Description |
 |---|---|---|
-| **Extract** | `src/extract.py` | Loads a reference table of 30 real Berlin U-/S-Bahn station coordinates and generates a listings dataset geographically anchored to Berlin's 12 Bezirke (districts). |
-| **Transform** | `src/transform.py` | Cleans nulls/outliers (percentile-based price filtering), computes `dist_center_km` and `dist_nearest_station_km` via `geopy.distance.geodesic`, builds a `GeoDataFrame`, exports a GeoPackage. |
-| **Load** | `src/load.py` | Persists the cleaned table into SQLite (`data/processed/berlin_real_estate.db`) with indexes on `bezirk` and `nearest_station`. |
-| **Model** | `src/model.py` | Trains Linear Regression and Random Forest regressors (scikit-learn `Pipeline` + `ColumnTransformer`), evaluates with RMSE / MAE / R² on a held-out test split, saves the better model with `joblib`. |
-| **Visualize** | `src/visualize.py` | Builds an interactive Folium HTML map (color-coded by €/sqm, station markers, popups) and a static Matplotlib map with basemap-tile support. |
+| **Extract** | `src/extract.py` | Validates the 5 raw CSVs (row counts, presence) — already downloaded from Kaggle into `data/raw/`. |
+| **Transform** | `src/transform.py` | Cleans nulls/outliers (1st/99th percentile on €/m²), and — independently of the dataset's own `transit_distance_min` column — computes nearest-transit-station distance via a **GeoPandas + `scipy.cKDTree` nearest-neighbor search in a projected metric CRS (EPSG:25833)** against the 135 real station coordinates. Validates this independent computation against the dataset's provided walking-time column (Pearson r = 0.738) as a data-quality check. |
+| **Load** | `src/load.py` | Persists all 5 cleaned tables (sales, rentals, new construction, monthly Kiez time series, stations) into one SQLite database with indexes. |
+| **Model** | `src/model.py` | Linear Regression vs. Random Forest predicting `price_eur` on the secondary-sales market from structural, building-quality, and macro features. Evaluated with RMSE/MAE/R² on a held-out split. |
+| **Policy analysis** | `src/policy_analysis.py` | Builds a listing-count-weighted citywide monthly price index from the 82-Ortsteil × 76-month time series and overlays it with the ECB rate and 7 real Berlin housing-policy events. |
+| **Visualize** | `src/visualize.py` | Folium interactive map (stratified 2,000-listing sample + all 135 real stations) and a static Matplotlib fallback map. |
 
-## ⚠️ Data source note
+## Results
 
-This project currently runs on a **synthetic-but-geographically-grounded**
-dataset, not a live pull from `daten.berlin.de` — I built it this way because
-my sandbox environment doesn't have outbound access to Berlin's open data
-portal or listing sites at the moment. What *is* real:
-
-- The 30 station coordinates (`berlin_stations.csv`) are actual Berlin
-  U-/S-Bahn locations.
-- The 12 Bezirk centroids and their relative price ordering follow the real
-  Berlin market pattern (Mitte/Charlottenburg pricier, Marzahn-Hellersdorf
-  cheaper).
-- The price-generation formula (size, condition, building age, district
-  desirability + noise) is designed so the downstream regression has a
-  genuine, non-trivial signal to recover — it is not a lookup table.
-
-**To swap in real data**: replace `generate_synthetic_listings()` in
-`extract.py` with a loader for a real export (Berlin Open Data /
-Gutachterausschuss Bodenrichtwerte, or a Kaggle "Berlin housing prices" CSV).
-As long as the output has columns
-`[listing_id, lat, lon, size_sqm, rooms, year_built, condition, bezirk, price_eur]`,
-every downstream stage works unchanged.
-
-## Results (on the synthetic dataset, n=1470 after cleaning)
+**Price prediction (secondary market, n=49,000 after cleaning):**
 
 | Model | RMSE (€) | MAE (€) | R² |
 |---|---|---|---|
-| Linear Regression | 39,576 | 29,040 | 0.913 |
-| Random Forest | 41,377 | 28,592 | 0.905 |
+| Linear Regression | 99,186 | 68,061 | 0.820 |
+| Random Forest | 77,081 | 49,908 | **0.891** |
 
-Linear Regression edges out Random Forest here because the synthetic
-price-generation function is close to linear in its features — on a real,
-noisier listings dataset with nonlinear interactions (e.g. size × location
-premium), I'd expect the Random Forest to pull ahead, which is why the
-pipeline evaluates both rather than assuming one wins.
+Random Forest clearly outperforms here — unlike on the earlier synthetic
+prototype of this project, where a near-linear synthetic price formula gave
+Linear Regression the edge. On real(er), richer hedonic data, the nonlinear
+interactions Random Forest captures (energy class mattering more after the
+2024 Heizungsgesetz, transit proximity mattering more in outer Bezirke than
+central ones) actually show up — exactly the pattern predicted when this
+project only had synthetic data to test on.
 
-Top price drivers (standardized linear coefficients): living space (`size_sqm`),
-then district (`bezirk_Mitte`, `bezirk_Charlottenburg-Wilmersdorf` positive;
-`bezirk_Marzahn-Hellersdorf`, `bezirk_Lichtenberg` negative), then renovation
-condition.
+**Top price drivers** (Random Forest feature importance): living space
+(`area_m2`, 61%), then distance to Brandenburg Gate (13%), then building
+age, Bezirk (Steglitz-Zehlendorf and Charlottenburg-Wilmersdorf both command
+a premium), computed transit distance, and renovation condition.
+
+**Policy-shock findings** (from `policy_analysis.py`):
+- Average Kaltmiete rose from €11.73/m² pre-Mietendeckel-reversal to
+  €12.96/m² in the 6 months after the April 2021 constitutional ruling —
+  a +10.5% jump consistent with a suppressed-then-released price ceiling.
+- Sales prices hit a local trough of €5,145/m² in August 2023, during the
+  ECB's rate-hike cycle (peak rate 4.50% in October 2023) — before
+  recovering as the ECB began cutting in mid-2024.
 
 ## Design decisions worth defending in an interview
 
-- **Percentile-based outlier filtering** (1st/99th on €/sqm) instead of an
-  arbitrary fixed cutoff — transparent and reproducible.
-- **Brute-force nearest-station search** (30 stations × 1.5k listings =
-  45k geodesic calls, <1s) instead of a KD-tree — the right call at this
-  scale; noted in code as the point where I'd switch to a spatial index if
-  the station table grew into the thousands.
-- **SQLite over SpatiaLite** for the load stage — zero extra native
-  dependency, opens with the stdlib; the GeoPackage from the transform stage
-  remains the source of truth if real GIS queries (polygon joins, etc.) are
-  ever needed.
-- **Random Forest over a deeper model** (gradient boosting / neural net) —
-  higher interpretability via `feature_importances_`, and ~1.4k training
-  rows is small enough that a deeper model risks overfitting relative to a
-  bagged ensemble of shallow trees.
-- **Basemap tiles with graceful fallback** — `visualize.py` tries
-  `contextily` + OpenStreetMap tiles for the static map and falls back to a
-  plain lat/lon scatter if the network call fails, so the pipeline never
-  breaks on a sandboxed or offline machine.
+- **Independent geospatial validation, not column reuse.** The dataset
+  already ships a `transit_distance_min` column; the transform stage
+  computes its own nearest-station distance from scratch using GeoPandas
+  and a KD-tree in a proper projected CRS (EPSG:25833, UTM zone 33N — not
+  raw lat/lon degrees, which distort distance) and checks it correlates
+  with the provided column (r=0.738) rather than trusting the source
+  blindly.
+- **KD-tree over brute force.** The original synthetic prototype used
+  brute-force nearest-station search (fine at 1,500×30 scale); at
+  89,000×135 that would be far slower, so this version uses `scipy.cKDTree`
+  — the appropriate escalation as scale grows, and a deliberate choice
+  worth explaining if asked why the approach changed.
+- **Listing-count-weighted time index**, not a naive mean of Ortsteil
+  averages — a thin, low-liquidity Kiez shouldn't move the citywide index
+  as much as a large one with hundreds of monthly listings.
+- **Random Forest over a deeper model** — higher interpretability via
+  `feature_importances_`, appropriate given the dataset's actual
+  nonlinearities without the overfitting risk of a much deeper model.
+- **`joblib` model compression** — the uncompressed Random Forest was
+  227 MB (over GitHub's 100 MB file limit); reducing `n_estimators` from
+  300→150 and `max_depth` from 18→14, plus `compress=3`, brought it to
+  14.8 MB with R² moving by less than 0.006 — a good example of a
+  practical trade-off between artifact size and model quality.
 
 ## Project structure
 
 ```
 berlin_real_estate/
-├── main.py                  # orchestrates the full pipeline
+├── main.py
 ├── requirements.txt
 ├── src/
 │   ├── extract.py
 │   ├── transform.py
 │   ├── load.py
 │   ├── model.py
+│   ├── policy_analysis.py
 │   └── visualize.py
 ├── data/
-│   ├── raw/                 # extract.py output
-│   └── processed/           # transform/load/model output
-└── maps/                    # visualize.py output
+│   ├── raw/          # Kaggle source CSVs
+│   └── processed/    # cleaned tables, SQLite DB, trained model, metrics
+└── maps/              # interactive + static maps, policy shock chart
 ```
 
 ## Next steps
 
-- Swap in a real Berlin Open Data / Bodenrichtwert export.
-- Replace geodesic "as the crow flies" station distance with real walking
-  distance via `osmnx` + OSM street graph (blocked in this sandbox by
-  network access, straightforward with internet access).
-- Add SpatiaLite for true in-database spatial queries.
+- Extend the price model to the rental and new-construction segments
+  (rent-yield / buy-vs-rent comparison by Ortsteil).
 - Hyperparameter search (`GridSearchCV`) on the Random Forest.
+- Publish the policy-shock notebook on Kaggle against the original
+  dataset, crediting the source.

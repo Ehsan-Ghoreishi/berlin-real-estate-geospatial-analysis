@@ -1,18 +1,18 @@
 """
 model.py
 ========
-Trains and evaluates regression models predicting price_eur from
-structural + geospatial features. Mirrors the model-selection pattern
-used in the author's fraud-detection portfolio project: start with a
-simple, interpretable baseline (Linear Regression) then compare to a
-Random Forest, and report RMSE / R^2 -- not just a single accuracy
-number -- because this is a regression, not classification, problem.
+Trains Linear Regression and Random Forest models to predict secondary-
+market sale price (price_eur) from structural, building-quality, macro,
+and geospatial features -- a much richer feature set than the original
+synthetic prototype, since this data carries real energy-class,
+building-era, condition, and mortgage-rate-at-listing information.
 
-Interview-ready justification for Random Forest over a deeper model
-(e.g. gradient boosting / neural net): higher interpretability via
-feature_importances_, and the training set here (~1.4k rows) is small
-enough that a deep model would be prone to overfitting relative to a
-bagged ensemble of shallow trees.
+Two models are compared and the better one (by RMSE) is kept, per the
+same rationale as before: Linear Regression for a transparent baseline,
+Random Forest for capturing nonlinear interactions (e.g. energy class
+mattering more after the 2024 Heizungsgesetz, or transit proximity
+mattering more in outer Bezirke than central ones) without the
+overfitting risk of a deeper model on this feature set.
 """
 
 import json
@@ -24,31 +24,37 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
-MODEL_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 
 NUMERIC_FEATURES = [
-    "size_sqm", "rooms", "year_built",
-    "dist_center_km", "dist_nearest_station_km",
+    "rooms", "area_m2", "floor", "total_floors", "year_built",
+    "computed_dist_nearest_station_km", "to_brandenburg_gate_km",
+    "mortgage_rate_at_listing", "months_since_2020",
 ]
-CATEGORICAL_FEATURES = ["bezirk", "condition"]
+CATEGORICAL_FEATURES = [
+    "bezirk", "building_era", "energy_class", "position", "condition",
+    "property_type",
+]
+BOOLEAN_FEATURES = ["has_lift", "has_balcony", "has_cellar", "has_parking"]
 TARGET = "price_eur"
 
 
 def load_data():
-    df = pd.read_csv(PROC_DIR / "listings_clean.csv")
+    df = pd.read_csv(PROC_DIR / "sales_clean.csv")
+    for c in BOOLEAN_FEATURES:
+        df[c] = df[c].astype(int)
     return df
 
 
 def build_pipeline(model):
     pre = ColumnTransformer(
         transformers=[
-            ("num", StandardScaler(), NUMERIC_FEATURES),
+            ("num", StandardScaler(), NUMERIC_FEATURES + BOOLEAN_FEATURES),
             ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
         ]
     )
@@ -60,17 +66,15 @@ def evaluate(pipe, X_test, y_test, name):
     rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
     mae = float(mean_absolute_error(y_test, preds))
     r2 = float(r2_score(y_test, preds))
-    print(f"[model] {name:18s} RMSE={rmse:,.0f} EUR  MAE={mae:,.0f} EUR  R2={r2:.3f}")
-    return {"model": name, "rmse_eur": round(rmse, 0),
-            "mae_eur": round(mae, 0), "r2": round(r2, 4)}
+    print(f"[model] {name:18s} RMSE={rmse:>10,.0f} EUR  MAE={mae:>10,.0f} EUR  R2={r2:.3f}")
+    return {"model": name, "rmse_eur": round(rmse, 0), "mae_eur": round(mae, 0), "r2": round(r2, 4)}
 
 
 def run():
     df = load_data()
-    X = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES]
+    X = df[NUMERIC_FEATURES + BOOLEAN_FEATURES + CATEGORICAL_FEATURES]
     y = df[TARGET]
 
-    # proper out-of-sample split -- no leakage, fixed seed for reproducibility
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
@@ -83,45 +87,39 @@ def run():
 
     rf_pipe = build_pipeline(
         RandomForestRegressor(
-            n_estimators=300, max_depth=12, min_samples_leaf=3,
+            n_estimators=150, max_depth=14, min_samples_leaf=5,
             random_state=42, n_jobs=-1,
         )
     )
     rf_pipe.fit(X_train, y_train)
     results.append(evaluate(rf_pipe, X_test, y_test, "RandomForest"))
 
-    # pick best by RMSE, save it
     best = min(results, key=lambda r: r["rmse_eur"])
     best_pipe = rf_pipe if best["model"] == "RandomForest" else lin_pipe
+    joblib.dump(best_pipe, PROC_DIR / "price_model.joblib", compress=3)
+    model_size_mb = (PROC_DIR / "price_model.joblib").stat().st_size / 1e6
+    print(f"[model] best model = {best['model']} -> saved ({model_size_mb:.1f} MB)")
 
-    model_path = MODEL_DIR / "price_model.joblib"
-    joblib.dump(best_pipe, model_path)
-    print(f"[model] best model = {best['model']} -> saved to {model_path}")
-
-    # interpretability output for the write-up / interview -- works
-    # for whichever model won
-    winning_pipe = rf_pipe if best["model"] == "RandomForest" else lin_pipe
-    ohe = winning_pipe.named_steps["pre"].named_transformers_["cat"]
-    feat_names = NUMERIC_FEATURES + list(ohe.get_feature_names_out(CATEGORICAL_FEATURES))
+    ohe = best_pipe.named_steps["pre"].named_transformers_["cat"]
+    feat_names = (NUMERIC_FEATURES + BOOLEAN_FEATURES
+                  + list(ohe.get_feature_names_out(CATEGORICAL_FEATURES)))
 
     if best["model"] == "RandomForest":
-        importances = winning_pipe.named_steps["model"].feature_importances_
-        top = sorted(zip(feat_names, importances), key=lambda t: -t[1])[:10]
+        importances = best_pipe.named_steps["model"].feature_importances_
+        top = sorted(zip(feat_names, importances), key=lambda t: -t[1])[:12]
         print("[model] top feature importances (RandomForest):")
         for f, imp in top:
-            print(f"    {f:30s} {imp:.4f}")
+            print(f"    {f:40s} {imp:.4f}")
     else:
-        coefs = winning_pipe.named_steps["model"].coef_
-        top = sorted(zip(feat_names, coefs), key=lambda t: -abs(t[1]))[:10]
+        coefs = best_pipe.named_steps["model"].coef_
+        top = sorted(zip(feat_names, coefs), key=lambda t: -abs(t[1]))[:12]
         print("[model] top standardized coefficients (LinearRegression):")
         for f, c in top:
-            print(f"    {f:30s} {c:+,.0f}")
+            print(f"    {f:40s} {c:+,.0f}")
 
-    metrics_path = PROC_DIR / "model_metrics.json"
-    with open(metrics_path, "w") as f:
+    with open(PROC_DIR / "model_metrics.json", "w") as f:
         json.dump(results, f, indent=2)
-    print(f"[model] metrics -> {metrics_path}")
-
+    print(f"[model] metrics -> {PROC_DIR/'model_metrics.json'}")
     return results
 
 
