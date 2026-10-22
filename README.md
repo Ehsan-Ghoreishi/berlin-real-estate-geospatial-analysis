@@ -32,6 +32,10 @@ Outputs land in `data/processed/` and `maps/`. A full run takes ~20s on
 ~89,000 combined listings. All seeds are fixed in `src/config.py`, so the
 CSV outputs are reproducible run to run.
 
+For a guided walkthrough of the results with charts, open
+[`notebooks/berlin_market_analysis.ipynb`](notebooks/berlin_market_analysis.ipynb)
+(rendered with outputs on GitHub; re-run with `make notebook`).
+
 ### Development
 
 ```bash
@@ -191,6 +195,7 @@ berlin_real_estate/
 │   ├── policy_analysis.py
 │   ├── yield_analysis.py
 │   └── visualize.py
+├── notebooks/           # executed analysis walkthrough
 ├── tests/               # pytest suite
 ├── .github/workflows/   # CI
 ├── data/
