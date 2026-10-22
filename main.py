@@ -6,9 +6,12 @@ Runs the full pipeline end to end:
     extract -> transform -> load -> model -> policy_analysis -> visualize
 
 Usage:
-    python3 main.py
+    python3 main.py                          # run every stage
+    python3 main.py --stages model visualize # run a subset, in pipeline order
+    python3 main.py --list                   # show available stages
 """
 
+import argparse
 import logging
 import time
 
@@ -16,35 +19,48 @@ from src import extract, load, model, policy_analysis, transform, visualize
 
 logger = logging.getLogger(__name__)
 
+STAGES = {
+    "extract": extract.run,
+    "transform": transform.run,
+    "load": load.run,
+    "model": model.run,
+    "policy_analysis": policy_analysis.run,
+    "visualize": visualize.run,
+}
 
-def run_pipeline():
+
+def run_pipeline(stages=None):
+    selected = [s for s in STAGES if stages is None or s in stages]
     t0 = time.time()
 
-    logger.info("=== [1/6] EXTRACT ===")
-    extract.run()
-
-    logger.info("=== [2/6] TRANSFORM ===")
-    transform.run()
-
-    logger.info("=== [3/6] LOAD ===")
-    load.run()
-
-    logger.info("=== [4/6] MODEL ===")
-    model.run()
-
-    logger.info("=== [5/6] POLICY ANALYSIS ===")
-    policy_analysis.run()
-
-    logger.info("=== [6/6] VISUALIZE ===")
-    visualize.run()
+    for i, name in enumerate(selected, start=1):
+        logger.info(f"=== [{i}/{len(selected)}] {name.upper().replace('_', ' ')} ===")
+        stage_t0 = time.time()
+        STAGES[name]()
+        logger.info(f"{name} finished in {time.time() - stage_t0:.1f}s")
 
     logger.info(f"Pipeline complete in {time.time() - t0:.1f}s")
 
 
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="Berlin real estate ETL + ML pipeline")
+    parser.add_argument(
+        "--stages", nargs="+", choices=list(STAGES), metavar="STAGE",
+        help="subset of stages to run (always executed in pipeline order)",
+    )
+    parser.add_argument("--list", action="store_true", help="list stages and exit")
+    parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
+    args = parse_args()
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)-7s %(name)-22s %(message)s",
         datefmt="%H:%M:%S",
     )
-    run_pipeline()
+    if args.list:
+        print("\n".join(STAGES))
+    else:
+        run_pipeline(args.stages)
