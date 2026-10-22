@@ -44,9 +44,14 @@ CI runs lint and tests on every push and pull request.
 
 ## Dataset
 
-**Source**: ["Berlin Real Estate: Sales, New Construction & Rentals
-(2020–2026)"](https://www.kaggle.com/) by Sergey Nefedov, downloaded from
-Kaggle. ~96,000 rows across 5 files, ~20 MB.
+**Source**: ["Berlin Real Estate: Sales & Rentals 2020-2026"](https://www.kaggle.com/datasets/sergionefedov/berlin-real-estate-sales-and-rentals-2020-2026)
+by Sergey Nefedov (Apache 2.0 licence), downloaded from Kaggle. ~96,000
+rows across 5 files, ~20 MB.
+
+```bash
+kaggle datasets download sergionefedov/berlin-real-estate-sales-and-rentals-2020-2026 \
+    -p data/raw --unzip
+```
 
 **What's real vs. generated** (per the dataset's own documentation):
 
@@ -193,4 +198,4 @@ berlin_real_estate/
 
 ## License
 
-[MIT](LICENSE). The dataset is subject to its own Kaggle license.
+Code: [MIT](LICENSE). Data: Apache 2.0, © Sergey Nefedov (see the Kaggle page).
