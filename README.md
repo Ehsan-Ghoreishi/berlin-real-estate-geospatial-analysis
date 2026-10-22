@@ -32,6 +32,12 @@ Outputs land in `data/processed/` and `maps/`. A full run takes ~20s on
 ~89,000 combined listings. All seeds are fixed in `src/config.py`, so the
 CSV outputs are reproducible run to run.
 
+Or, with no local Python setup:
+
+```bash
+make docker-build && make docker-run   # outputs are written back to data/processed/ and maps/
+```
+
 For a guided walkthrough of the results with charts, open
 [`notebooks/berlin_market_analysis.ipynb`](notebooks/berlin_market_analysis.ipynb)
 (rendered with outputs on GitHub; re-run with `make notebook`).
@@ -183,6 +189,7 @@ condition (0.08), energy class (0.05), and the computed transit distance
 berlin_real_estate/
 ├── main.py              # CLI entry point (--stages, --list)
 ├── Makefile
+├── Dockerfile
 ├── pyproject.toml       # ruff + pytest config
 ├── requirements.txt
 ├── requirements-dev.txt

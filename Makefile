@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint typecheck format test run tune notebook clean
+.PHONY: help install install-dev lint typecheck format test run tune notebook docker-build docker-run clean
 
 PYTHON ?= python3
 
@@ -34,6 +34,12 @@ tune:  ## Hyperparameter search for the gradient-boosting model (~3 min)
 
 notebook:  ## Re-execute the analysis notebook in place (needs `make run` first)
 	cd notebooks && jupyter nbconvert --to notebook --execute --inplace berlin_market_analysis.ipynb
+
+docker-build:  ## Build the pipeline image
+	docker build -t berlin-real-estate .
+
+docker-run:  ## Run the full pipeline in Docker, writing outputs to the host
+	docker run --rm -v "$(CURDIR)/data/processed:/app/data/processed" -v "$(CURDIR)/maps:/app/maps" berlin-real-estate
 
 clean:  ## Remove caches
 	rm -rf .pytest_cache .ruff_cache
