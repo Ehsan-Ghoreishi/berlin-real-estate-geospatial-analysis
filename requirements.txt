@@ -9,3 +9,4 @@ contextily==1.7.1
 joblib==1.5.3
 pyproj==3.7.2
 scipy==1.17.1
+threadpoolctl==3.6.0
