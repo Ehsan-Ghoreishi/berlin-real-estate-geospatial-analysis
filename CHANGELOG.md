@@ -3,6 +3,27 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-10-22
+
+### Added
+- Histogram Gradient Boosting model, now the saved best model
+  (holdout R² 0.940 vs 0.891 for Random Forest; 0.7 MB vs 14.8 MB).
+- `src/tune.py` randomized hyperparameter search (`make tune`).
+- Executed analysis notebook in `notebooks/` (`make notebook`).
+- Dockerfile and `make docker-build` / `make docker-run`; CI builds the image.
+- Type hints on all functions, checked with mypy locally and in CI.
+
+### Changed
+- Generated binaries (SQLite DB, model, GeoPackage) are no longer tracked;
+  `make run` rebuilds them.
+- README links the exact Kaggle dataset and its Apache 2.0 licence.
+- Feature importance falls back to permutation importance for models
+  without built-in importances.
+
+### Fixed
+- OpenMP thread oversubscription in gradient boosting on many-core
+  machines (model stage 2 min -> 50 s).
+
 ## [0.2.0] - 2026-10-22
 
 ### Added
