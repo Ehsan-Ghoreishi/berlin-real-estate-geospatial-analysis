@@ -47,19 +47,34 @@ _LISTING_COLS = {"date_listed", "ortsteil", "bezirk", "lat", "lon", "area_m2", "
 # Columns the downstream stages actually depend on -- a renamed or dropped
 # column should fail here, not as a KeyError three stages later.
 REQUIRED_COLUMNS = {
-    "secondary_sales.csv": _LISTING_COLS | {
-        "price_eur", "price_per_m2_eur", "year_built", "building_era",
-        "energy_class", "condition", "transit_distance_min",
-        "to_brandenburg_gate_km", "mortgage_rate_at_listing",
+    "secondary_sales.csv": _LISTING_COLS
+    | {
+        "price_eur",
+        "price_per_m2_eur",
+        "year_built",
+        "building_era",
+        "energy_class",
+        "condition",
+        "transit_distance_min",
+        "to_brandenburg_gate_km",
+        "mortgage_rate_at_listing",
     },
-    "rentals.csv": _LISTING_COLS | {
-        "warmmiete_eur_monthly", "rent_per_m2_kalt_eur",
+    "rentals.csv": _LISTING_COLS
+    | {
+        "warmmiete_eur_monthly",
+        "rent_per_m2_kalt_eur",
     },
     "new_construction.csv": _LISTING_COLS | {"price_eur", "price_per_m2_eur"},
     "kiez_prices_monthly.csv": {
-        "year_month", "ortsteil", "bezirk", "secondary_price_per_m2_eur",
-        "kaltmiete_per_m2_monthly_eur", "n_listings_secondary",
-        "n_listings_rental", "ecb_main_rate_pct", "avg_mortgage_rate_pct",
+        "year_month",
+        "ortsteil",
+        "bezirk",
+        "secondary_price_per_m2_eur",
+        "kaltmiete_per_m2_monthly_eur",
+        "n_listings_secondary",
+        "n_listings_rental",
+        "ecb_main_rate_pct",
+        "avg_mortgage_rate_pct",
     },
     "transit_stations.csv": {"station_name", "line", "lat", "lon"},
 }
@@ -85,9 +100,7 @@ def run():
     for fname in EXPECTED_ROWS:
         path = RAW_DIR / fname
         if not path.exists():
-            raise FileNotFoundError(
-                f"{path} not found -- place the Kaggle CSV export in data/raw/"
-            )
+            raise FileNotFoundError(f"{path} not found -- place the Kaggle CSV export in data/raw/")
         validate_file(fname, pd.read_csv(path))
     logger.info("all source files present with required columns")
 

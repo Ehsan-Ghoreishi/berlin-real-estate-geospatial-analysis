@@ -13,10 +13,12 @@ def test_clean_percentile_drops_extremes():
 
 
 def test_nearest_station_picks_closest(stations):
-    listings = pd.DataFrame({
-        "lat": [52.5215, 52.5070],  # next to Alexanderplatz, next to Zoo
-        "lon": [13.4110, 13.3330],
-    })
+    listings = pd.DataFrame(
+        {
+            "lat": [52.5215, 52.5070],  # next to Alexanderplatz, next to Zoo
+            "lon": [13.4110, 13.3330],
+        }
+    )
     out = nearest_station_kdtree(listings, stations)
     assert out["computed_nearest_station"].tolist() == ["Alexanderplatz", "Zoologischer Garten"]
     assert (out["computed_dist_nearest_station_km"] < 0.3).all()

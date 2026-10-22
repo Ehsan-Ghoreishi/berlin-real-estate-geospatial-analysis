@@ -59,6 +59,7 @@ def run(db_path: Path = DB_PATH, proc_dir: Path = PROC_DIR) -> Path:
     logger.info("average EUR/m2 by Bezirk:\n%s", check.to_string(index=False))
     return db_path
 
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()

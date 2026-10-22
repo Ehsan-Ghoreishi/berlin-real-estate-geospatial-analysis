@@ -41,8 +41,7 @@ def clean_percentile(df: pd.DataFrame, col: str, lo_q=0.01, hi_q=0.99) -> pd.Dat
     lo, hi = df[col].quantile([lo_q, hi_q])
     before = len(df)
     df = df[df[col].between(lo, hi)]
-    logger.info(f"{col}: dropped {before - len(df)} outliers "
-          f"outside [{lo:,.0f}, {hi:,.0f}]")
+    logger.info(f"{col}: dropped {before - len(df)} outliers outside [{lo:,.0f}, {hi:,.0f}]")
     return df
 
 
@@ -52,12 +51,14 @@ def nearest_station_kdtree(listings: pd.DataFrame, stations: pd.DataFrame) -> pd
     have 50k+ listings against 135 stations (unlike the small demo in
     the original prototype, brute force would be too slow at this scale)."""
     listings_gdf = gpd.GeoDataFrame(
-        listings, geometry=gpd.points_from_xy(listings["lon"], listings["lat"]),
+        listings,
+        geometry=gpd.points_from_xy(listings["lon"], listings["lat"]),
         crs=WGS84_CRS,
     ).to_crs(epsg=METRIC_CRS)  # ETRS89 / UTM zone 33N -- correct metric CRS for Berlin
 
     stations_gdf = gpd.GeoDataFrame(
-        stations, geometry=gpd.points_from_xy(stations["lon"], stations["lat"]),
+        stations,
+        geometry=gpd.points_from_xy(stations["lon"], stations["lat"]),
         crs=WGS84_CRS,
     ).to_crs(epsg=METRIC_CRS)
 
@@ -77,9 +78,7 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["listing_year"] = df["date_listed"].dt.year
     df["listing_month"] = df["date_listed"].dt.month
-    df["months_since_2020"] = (
-        (df["date_listed"].dt.year - 2020) * 12 + df["date_listed"].dt.month
-    )
+    df["months_since_2020"] = (df["date_listed"].dt.year - 2020) * 12 + df["date_listed"].dt.month
     return df
 
 
@@ -116,8 +115,10 @@ def validate_distance_columns(sales: pd.DataFrame):
     minutes). Prints Pearson correlation as a lightweight data-quality
     signal, not a formal test."""
     corr = sales["computed_dist_nearest_station_km"].corr(sales["transit_distance_min"])
-    logger.info(f"validation: corr(computed_km, provided_transit_min) = {corr:.3f} "
-          f"(expect positive -- further station distance -> longer walk time)")
+    logger.info(
+        f"validation: corr(computed_km, provided_transit_min) = {corr:.3f} "
+        f"(expect positive -- further station distance -> longer walk time)"
+    )
 
 
 def run():
@@ -145,7 +146,7 @@ def run():
         sales, geometry=gpd.points_from_xy(sales["lon"], sales["lat"]), crs=WGS84_CRS
     )
     gdf.to_file(PROC_DIR / "sales_clean.gpkg", driver="GPKG", layer="sales")
-    logger.info(f"wrote GeoPackage -> {PROC_DIR/'sales_clean.gpkg'}")
+    logger.info(f"wrote GeoPackage -> {PROC_DIR / 'sales_clean.gpkg'}")
 
 
 if __name__ == "__main__":

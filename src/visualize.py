@@ -94,11 +94,18 @@ def build_static_map(sample: pd.DataFrame) -> Path:
         from shapely.geometry import Point
 
         gdf = gpd.GeoDataFrame(
-            sample, geometry=[Point(xy) for xy in zip(sample["lon"], sample["lat"])],
+            sample,
+            geometry=[Point(xy) for xy in zip(sample["lon"], sample["lat"])],
             crs="EPSG:4326",
         ).to_crs(epsg=3857)
-        sc = ax.scatter(gdf.geometry.x, gdf.geometry.y, c=sample["price_per_m2_eur"],
-                         cmap="RdYlGn_r", s=8, alpha=0.7)
+        sc = ax.scatter(
+            gdf.geometry.x,
+            gdf.geometry.y,
+            c=sample["price_per_m2_eur"],
+            cmap="RdYlGn_r",
+            s=8,
+            alpha=0.7,
+        )
         cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, timeout=3)
         ax.set_axis_off()
         basemap_ok = True
@@ -107,8 +114,14 @@ def build_static_map(sample: pd.DataFrame) -> Path:
         ax.clear()
 
     if not basemap_ok:
-        sc = ax.scatter(sample["lon"], sample["lat"], c=sample["price_per_m2_eur"],
-                         cmap="RdYlGn_r", s=8, alpha=0.7)
+        sc = ax.scatter(
+            sample["lon"],
+            sample["lat"],
+            c=sample["price_per_m2_eur"],
+            cmap="RdYlGn_r",
+            s=8,
+            alpha=0.7,
+        )
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
         ax.set_aspect("equal")

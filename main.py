@@ -55,7 +55,10 @@ def run_pipeline(stages=None):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Berlin real estate ETL + ML pipeline")
     parser.add_argument(
-        "--stages", nargs="+", choices=list(STAGES), metavar="STAGE",
+        "--stages",
+        nargs="+",
+        choices=list(STAGES),
+        metavar="STAGE",
         help="subset of stages to run (always executed in pipeline order)",
     )
     parser.add_argument("--list", action="store_true", help="list stages and exit")

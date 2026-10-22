@@ -21,11 +21,13 @@ def test_validate_file_warns_on_row_count(caplog):
 
 def test_load_writes_tables_and_indexes(tmp_path):
     for table, fname in load.TABLES.items():
-        pd.DataFrame({
-            "bezirk": ["Mitte", "Pankow"],
-            "ortsteil": ["Mitte (Ort)", "Prenzlauer Berg"],
-            "price_per_m2_eur": [7000, 6000],
-        }).to_csv(tmp_path / fname, index=False)
+        pd.DataFrame(
+            {
+                "bezirk": ["Mitte", "Pankow"],
+                "ortsteil": ["Mitte (Ort)", "Prenzlauer Berg"],
+                "price_per_m2_eur": [7000, 6000],
+            }
+        ).to_csv(tmp_path / fname, index=False)
 
     db = load.run(db_path=tmp_path / "test.db", proc_dir=tmp_path)
 
