@@ -1,33 +1,39 @@
 """
 model.py
 ========
-Trains Linear Regression and Random Forest models to predict secondary-
-market sale price (price_eur) from structural, building-quality, macro,
-and geospatial features -- a much richer feature set than the original
+Trains Linear Regression, Random Forest and Histogram Gradient Boosting
+models to predict secondary-market sale price (price_eur) from structural,
+building-quality, macro, and geospatial features -- a much richer feature set than the original
 synthetic prototype, since this data carries real energy-class,
 building-era, condition, and mortgage-rate-at-listing information.
 
-Two models are compared and the better one (by RMSE) is kept, per the
+The models are compared and the best one (by holdout RMSE) is kept, per the
 same rationale as before: Linear Regression for a transparent baseline,
 Random Forest for capturing nonlinear interactions (e.g. energy class
 mattering more after the 2024 Heizungsgesetz, or transit proximity
 mattering more in outer Bezirke than central ones) without the
-overfitting risk of a deeper model on this feature set.
+overfitting risk of a deeper model on this feature set, and gradient
+boosting, which fits those interactions sequentially and is both more
+accurate and ~20x smaller on disk than the forest here.
 """
 
 import json
 import logging
+from typing import Any
 
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from threadpoolctl import threadpool_limits
 
 from src.config import METRICS_PATH, MODEL_PATH, PROC_DIR, RANDOM_STATE
 
@@ -56,26 +62,34 @@ BOOLEAN_FEATURES = ["has_lift", "has_balcony", "has_cellar", "has_parking"]
 TARGET = "price_eur"
 CV_FOLDS = 5
 TEMPORAL_CUTOFF = "2025-01-01"
+# HistGradientBoosting's OpenMP threads contend badly on many-core machines
+# at this data size (a fit took 13s with 14 threads vs 4s with 4)
+OPENMP_THREADS = 4
 
 
-def load_data():
+def load_data() -> pd.DataFrame:
     df = pd.read_csv(PROC_DIR / "sales_clean.csv")
     for c in BOOLEAN_FEATURES:
         df[c] = df[c].astype(int)
     return df
 
 
-def build_pipeline(model):
+def build_pipeline(model: BaseEstimator) -> Pipeline:
     pre = ColumnTransformer(
         transformers=[
             ("num", StandardScaler(), NUMERIC_FEATURES + BOOLEAN_FEATURES),
-            ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
+            # dense output: HistGradientBoosting does not accept sparse input
+            (
+                "cat",
+                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                CATEGORICAL_FEATURES,
+            ),
         ]
     )
     return Pipeline(steps=[("pre", pre), ("model", model)])
 
 
-def candidate_models():
+def candidate_models() -> dict[str, BaseEstimator]:
     return {
         "LinearRegression": LinearRegression(),
         "RandomForest": RandomForestRegressor(
@@ -85,10 +99,20 @@ def candidate_models():
             random_state=RANDOM_STATE,
             n_jobs=-1,
         ),
+        "HistGradientBoosting": HistGradientBoostingRegressor(
+            max_iter=500,
+            learning_rate=0.08,
+            max_leaf_nodes=48,
+            min_samples_leaf=20,
+            l2_regularization=1.0,
+            random_state=RANDOM_STATE,
+        ),
     }
 
 
-def cross_validate_model(model, X, y, name, folds=CV_FOLDS):
+def cross_validate_model(
+    model: BaseEstimator, X: pd.DataFrame, y: pd.Series, name: str, folds: int = CV_FOLDS
+) -> dict[str, Any]:
     """K-fold CV on the full dataset: a single 80/20 split can be lucky,
     so report mean +/- std across folds to show the score is stable."""
     cv = KFold(n_splits=folds, shuffle=True, random_state=RANDOM_STATE)
@@ -102,7 +126,7 @@ def cross_validate_model(model, X, y, name, folds=CV_FOLDS):
     rmse = -scores["test_rmse"]
     r2 = scores["test_r2"]
     logger.info(
-        f"{name:18s} {folds}-fold CV  RMSE={rmse.mean():>10,.0f} "
+        f"{name:20s} {folds}-fold CV  RMSE={rmse.mean():>10,.0f} "
         f"+/- {rmse.std():,.0f} EUR  R2={r2.mean():.3f} +/- {r2.std():.3f}"
     )
     return {
@@ -115,7 +139,9 @@ def cross_validate_model(model, X, y, name, folds=CV_FOLDS):
     }
 
 
-def temporal_holdout(model, df, name, cutoff=TEMPORAL_CUTOFF):
+def temporal_holdout(
+    model: BaseEstimator, df: pd.DataFrame, name: str, cutoff: str = TEMPORAL_CUTOFF
+) -> dict[str, Any]:
     """Out-of-time check: train on listings before `cutoff`, test on
     listings after it. Random splits let the model see neighbouring
     months of the same market regime; this asks the harder question of
@@ -130,16 +156,58 @@ def temporal_holdout(model, df, name, cutoff=TEMPORAL_CUTOFF):
     return result
 
 
-def evaluate(pipe, X_test, y_test, name):
+def evaluate(pipe: Pipeline, X_test: pd.DataFrame, y_test: pd.Series, name: str) -> dict[str, Any]:
     preds = pipe.predict(X_test)
     rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
     mae = float(mean_absolute_error(y_test, preds))
     r2 = float(r2_score(y_test, preds))
-    logger.info(f"{name:18s} RMSE={rmse:>10,.0f} EUR  MAE={mae:>10,.0f} EUR  R2={r2:.3f}")
+    logger.info(f"{name:20s} RMSE={rmse:>10,.0f} EUR  MAE={mae:>10,.0f} EUR  R2={r2:.3f}")
     return {"model": name, "rmse_eur": round(rmse, 0), "mae_eur": round(mae, 0), "r2": round(r2, 4)}
 
 
-def run():
+def log_top_features(
+    pipe: Pipeline, name: str, X_test: pd.DataFrame, y_test: pd.Series, top_n: int = 12
+) -> None:
+    """Tree ensembles with impurity importances and linear models with
+    coefficients report those directly; anything else (e.g. gradient
+    boosting) falls back to permutation importance on the raw columns."""
+    model = pipe.named_steps["model"]
+    ohe = pipe.named_steps["pre"].named_transformers_["cat"]
+    feat_names = (
+        NUMERIC_FEATURES + BOOLEAN_FEATURES + list(ohe.get_feature_names_out(CATEGORICAL_FEATURES))
+    )
+    if hasattr(model, "feature_importances_"):
+        pairs, label, fmt = (
+            zip(feat_names, model.feature_importances_, strict=True),
+            "importances",
+            ".4f",
+        )
+    elif hasattr(model, "coef_"):
+        pairs, label, fmt = (
+            zip(feat_names, model.coef_, strict=True),
+            "standardized coefficients",
+            "+,.0f",
+        )
+    else:
+        # a 5k-row sample keeps this to a few seconds; ranking is stable at that size
+        sample = X_test.sample(min(len(X_test), 5000), random_state=RANDOM_STATE)
+        perm = permutation_importance(
+            pipe, sample, y_test.loc[sample.index], n_repeats=5, random_state=RANDOM_STATE
+        )
+        pairs = zip(X_test.columns, perm.importances_mean, strict=True)
+        label, fmt = "permutation importances (R2 drop)", ".4f"
+    top = sorted(pairs, key=lambda t: -abs(t[1]))[:top_n]
+    logger.info(f"top feature {label} ({name}):")
+    for f, v in top:
+        logger.info(f"    {f:40s} {v:{fmt}}")
+
+
+def run() -> dict[str, list[dict[str, Any]]]:
+    with threadpool_limits(limits=OPENMP_THREADS, user_api="openmp"):
+        return _run()
+
+
+def _run() -> dict[str, list[dict[str, Any]]]:
     df = load_data()
     X = df[NUMERIC_FEATURES + BOOLEAN_FEATURES + CATEGORICAL_FEATURES]
     y = df[TARGET]
@@ -163,23 +231,7 @@ def run():
     model_size_mb = MODEL_PATH.stat().st_size / 1e6
     logger.info(f"best model = {best['model']} -> saved ({model_size_mb:.1f} MB)")
 
-    ohe = best_pipe.named_steps["pre"].named_transformers_["cat"]
-    feat_names = (
-        NUMERIC_FEATURES + BOOLEAN_FEATURES + list(ohe.get_feature_names_out(CATEGORICAL_FEATURES))
-    )
-
-    if best["model"] == "RandomForest":
-        importances = best_pipe.named_steps["model"].feature_importances_
-        top = sorted(zip(feat_names, importances, strict=True), key=lambda t: -t[1])[:12]
-        logger.info("top feature importances (RandomForest):")
-        for f, imp in top:
-            logger.info(f"    {f:40s} {imp:.4f}")
-    else:
-        coefs = best_pipe.named_steps["model"].coef_
-        top = sorted(zip(feat_names, coefs, strict=True), key=lambda t: -abs(t[1]))[:12]
-        logger.info("top standardized coefficients (LinearRegression):")
-        for f, c in top:
-            logger.info(f"    {f:40s} {c:+,.0f}")
+    log_top_features(best_pipe, best["model"], X_test, y_test)
 
     with open(METRICS_PATH, "w") as f:
         json.dump(

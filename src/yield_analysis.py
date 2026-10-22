@@ -26,6 +26,7 @@ costs -- it's a relative comparison, not an investment return.
 
 import logging
 from pathlib import Path
+from typing import TypeVar
 
 import matplotlib
 import numpy as np
@@ -38,18 +39,21 @@ from src.config import MAP_DIR, PROC_DIR, ensure_dirs
 
 logger = logging.getLogger(__name__)
 
+# works on scalars and on pandas Series alike
+T = TypeVar("T", float, pd.Series)
+
 WINDOW_MONTHS = 12
 MIN_LISTINGS = 30
 TOP_N = 12
 
 
-def gross_yield_pct(rent_m2_month, sales_m2):
+def gross_yield_pct(rent_m2_month: T, sales_m2: T) -> T:
     return rent_m2_month * 12 / sales_m2 * 100
 
 
 def citywide_yield_series(kiez: pd.DataFrame) -> pd.DataFrame:
-    def wavg(g, val_col, wt_col):
-        return np.average(g[val_col], weights=g[wt_col].clip(lower=1))
+    def wavg(g: pd.DataFrame, val_col: str, wt_col: str) -> float:
+        return float(np.average(g[val_col], weights=g[wt_col].clip(lower=1)))
 
     rows = []
     for ym, g in kiez.groupby("year_month"):
@@ -83,7 +87,7 @@ def ortsteil_yields(
     `window_months` months; Ortsteile with fewer than `min_listings` on
     either side are dropped as too thin to compare."""
 
-    def recent(df):
+    def recent(df: pd.DataFrame) -> pd.DataFrame:
         dates = pd.to_datetime(df["date_listed"])
         cutoff = dates.max() - pd.DateOffset(months=window_months)
         return df[dates > cutoff]
@@ -154,7 +158,7 @@ def plot_yields(yields: pd.DataFrame, series: pd.DataFrame, top_n: int = TOP_N) 
     return out_path
 
 
-def run():
+def run() -> pd.DataFrame:
     ensure_dirs()
     kiez = pd.read_csv(PROC_DIR / "kiez_monthly_clean.csv")
     sales = pd.read_csv(PROC_DIR / "sales_clean.csv")

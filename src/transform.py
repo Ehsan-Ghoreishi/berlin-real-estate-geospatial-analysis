@@ -28,7 +28,7 @@ from src.config import METRIC_CRS, PROC_DIR, RAW_DIR, WGS84_CRS, ensure_dirs
 logger = logging.getLogger(__name__)
 
 
-def load_raw():
+def load_raw() -> tuple[pd.DataFrame, ...]:
     sales = pd.read_csv(RAW_DIR / "secondary_sales.csv", parse_dates=["date_listed"])
     rentals = pd.read_csv(RAW_DIR / "rentals.csv", parse_dates=["date_listed"])
     new_build = pd.read_csv(RAW_DIR / "new_construction.csv", parse_dates=["date_listed"])
@@ -37,7 +37,9 @@ def load_raw():
     return sales, rentals, new_build, kiez_monthly, stations
 
 
-def clean_percentile(df: pd.DataFrame, col: str, lo_q=0.01, hi_q=0.99) -> pd.DataFrame:
+def clean_percentile(
+    df: pd.DataFrame, col: str, lo_q: float = 0.01, hi_q: float = 0.99
+) -> pd.DataFrame:
     lo, hi = df[col].quantile([lo_q, hi_q])
     before = len(df)
     df = df[df[col].between(lo, hi)]
@@ -109,19 +111,20 @@ def clean_new_construction(df: pd.DataFrame, stations: pd.DataFrame) -> pd.DataF
     return df.reset_index(drop=True)
 
 
-def validate_distance_columns(sales: pd.DataFrame):
+def validate_distance_columns(sales: pd.DataFrame) -> float:
     """Sanity check: our independently-computed nearest-station distance
     should correlate with the dataset's own transit_distance_min (walking
-    minutes). Prints Pearson correlation as a lightweight data-quality
+    minutes). Logs and returns the Pearson correlation as a lightweight data-quality
     signal, not a formal test."""
     corr = sales["computed_dist_nearest_station_km"].corr(sales["transit_distance_min"])
     logger.info(
         f"validation: corr(computed_km, provided_transit_min) = {corr:.3f} "
         f"(expect positive -- further station distance -> longer walk time)"
     )
+    return float(corr)
 
 
-def run():
+def run() -> None:
     ensure_dirs()
     sales, rentals, new_build, kiez_monthly, stations = load_raw()
 

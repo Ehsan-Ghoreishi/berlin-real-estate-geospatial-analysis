@@ -4,8 +4,8 @@ extract.py
 Extract stage. Unlike the original prototype, this version runs on a real
 downloaded Kaggle dataset rather than synthetic data.
 
-DATASET: "Berlin Real Estate: Sales, New Construction & Rentals (2020-2026)"
-by Sergey Nefedov, https://www.kaggle.com/datasets (search: "berlin housing")
+DATASET: "Berlin Real Estate: Sales & Rentals 2020-2026" by Sergey Nefedov
+(Apache 2.0), https://www.kaggle.com/datasets/sergionefedov/berlin-real-estate-sales-and-rentals-2020-2026
 
 WHAT'S REAL vs GENERATED IN THE SOURCE DATA (per the dataset's own
 documentation -- stated here for defensibility in an interview):
@@ -95,7 +95,7 @@ def validate_file(fname: str, df: pd.DataFrame) -> None:
         logger.info(f"    {fname:32s} {len(df):>7,} rows  OK")
 
 
-def run():
+def run() -> None:
     logger.info("validating raw Kaggle source files")
     for fname in EXPECTED_ROWS:
         path = RAW_DIR / fname
