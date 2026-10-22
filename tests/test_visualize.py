@@ -1,11 +1,13 @@
 import pandas as pd
+from matplotlib.colors import to_hex
 
-from src.visualize import price_color, stratified_sample
+from src.visualize import CMAP, price_color, stratified_sample
 
 
 def test_price_color_endpoints():
-    assert price_color(100, 100, 200) == "#00ff00"
-    assert price_color(200, 100, 200) == "#ff0000"
+    assert price_color(100, 100, 200) == to_hex(CMAP(0.0))
+    assert price_color(200, 100, 200) == to_hex(CMAP(1.0))
+    assert price_color(100, 100, 200) != price_color(200, 100, 200)
 
 
 def test_price_color_clamps_out_of_range():
@@ -14,7 +16,7 @@ def test_price_color_clamps_out_of_range():
 
 
 def test_price_color_constant_range():
-    assert price_color(5, 5, 5) == "#00ff00"
+    assert price_color(5, 5, 5) == to_hex(CMAP(0.0))
 
 
 def test_stratified_sample_keeps_bezirk_proportions():
