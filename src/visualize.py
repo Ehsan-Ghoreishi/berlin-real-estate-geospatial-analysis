@@ -20,12 +20,18 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import xyzservices.providers as xyz
 
 from src.config import MAP_DIR, PROC_DIR, RANDOM_STATE, WGS84_CRS, ensure_dirs
 
 logger = logging.getLogger(__name__)
 
 SAMPLE_SIZE = 2000
+
+# CARTO basemaps now require an API key (tiles render as "API KEY
+# REQUIRED"), so use Esri's keyless light-gray canvas; OpenStreetMap is
+# offered as a second, labelled layer on the interactive map.
+BASEMAP = xyz.Esri.WorldGrayCanvas
 
 
 def price_color(p: float, lo: float, hi: float) -> str:
@@ -42,7 +48,9 @@ def stratified_sample(df: pd.DataFrame, n: int, seed: int = RANDOM_STATE) -> pd.
 
 
 def build_interactive_map(sample: pd.DataFrame, stations: pd.DataFrame) -> Path:
-    m = folium.Map(location=[52.52, 13.405], zoom_start=11, tiles="cartodbpositron")
+    m = folium.Map(location=[52.52, 13.405], zoom_start=11, tiles=None)
+    folium.TileLayer(BASEMAP, name="Light gray (Esri)").add_to(m)
+    folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
 
     lo, hi = sample["price_per_m2_eur"].quantile([0.05, 0.95])
 
@@ -105,7 +113,7 @@ def build_static_map(sample: pd.DataFrame) -> Path:
             s=8,
             alpha=0.7,
         )
-        cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, timeout=3)
+        cx.add_basemap(ax, source=BASEMAP, timeout=3)
         ax.set_axis_off()
         basemap_ok = True
     except Exception as e:
