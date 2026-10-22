@@ -1,6 +1,5 @@
 geopandas==1.1.4
 shapely==2.1.2
-geopy==2.5.0
 folium==0.20.0
 scikit-learn==1.8.0
 pandas==3.0.2
