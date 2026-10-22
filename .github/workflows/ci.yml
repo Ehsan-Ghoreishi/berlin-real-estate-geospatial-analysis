@@ -29,3 +29,11 @@ jobs:
       - run: pytest
       - name: Smoke-test the pipeline CLI
         run: python main.py --stages extract
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t berlin-real-estate .
+      - name: Smoke-test the image
+        run: docker run --rm berlin-real-estate --stages extract
