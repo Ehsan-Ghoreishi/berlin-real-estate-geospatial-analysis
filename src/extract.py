@@ -95,7 +95,7 @@ def validate_file(fname: str, df: pd.DataFrame) -> None:
         logger.info(f"    {fname:32s} {len(df):>7,} rows  OK")
 
 
-def run():
+def run() -> None:
     logger.info("validating raw Kaggle source files")
     for fname in EXPECTED_ROWS:
         path = RAW_DIR / fname

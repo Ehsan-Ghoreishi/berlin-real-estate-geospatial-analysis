@@ -50,9 +50,9 @@ def weighted_monthly_index(df: pd.DataFrame) -> pd.DataFrame:
     citywide index rather than a naive unweighted mean of Ortsteil
     averages."""
 
-    def wavg(g, val_col, wt_col):
+    def wavg(g: pd.DataFrame, val_col: str, wt_col: str) -> float:
         w = g[wt_col].clip(lower=1)
-        return np.average(g[val_col], weights=w)
+        return float(np.average(g[val_col], weights=w))
 
     rows = []
     for ym, g in df.groupby("year_month"):
@@ -127,7 +127,7 @@ def plot_policy_shock_chart(idx: pd.DataFrame) -> Path:
     return out_path
 
 
-def run():
+def run() -> None:
     ensure_dirs()
     df = pd.read_csv(PROC_DIR / "kiez_monthly_clean.csv")
     idx = weighted_monthly_index(df)

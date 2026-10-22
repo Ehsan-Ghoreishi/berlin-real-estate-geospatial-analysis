@@ -14,6 +14,7 @@ scored once at the end so the reported number isn't tuned on.
 
 import json
 import logging
+from typing import Any
 
 from scipy.stats import loguniform, randint, uniform
 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -49,7 +50,7 @@ PARAM_DISTRIBUTIONS = {
 }
 
 
-def run(n_iter: int = N_ITER) -> dict:
+def run(n_iter: int = N_ITER) -> dict[str, Any]:
     df = load_data()
     X = df[NUMERIC_FEATURES + BOOLEAN_FEATURES + CATEGORICAL_FEATURES]
     y = df[TARGET]

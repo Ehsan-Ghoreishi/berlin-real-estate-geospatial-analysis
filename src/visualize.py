@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 SAMPLE_SIZE = 2000
 
 
-def price_color(p, lo, hi):
+def price_color(p: float, lo: float, hi: float) -> str:
     t = 0.0 if hi == lo else max(0.0, min(1.0, (p - lo) / (hi - lo)))
     r = int(255 * t)
     g = int(255 * (1 - t))
     return f"#{r:02x}{g:02x}00"
 
 
-def stratified_sample(df: pd.DataFrame, n: int, seed=RANDOM_STATE) -> pd.DataFrame:
+def stratified_sample(df: pd.DataFrame, n: int, seed: int = RANDOM_STATE) -> pd.DataFrame:
     frac = n / len(df)
     parts = [g.sample(frac=frac, random_state=seed) for _, g in df.groupby("bezirk")]
     return pd.concat(parts, ignore_index=True)
@@ -135,7 +135,7 @@ def build_static_map(sample: pd.DataFrame) -> Path:
     return out_path
 
 
-def run():
+def run() -> None:
     ensure_dirs()
     sales = pd.read_csv(PROC_DIR / "sales_clean.csv")
     stations = pd.read_csv(PROC_DIR / "stations_clean.csv")

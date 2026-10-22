@@ -19,10 +19,12 @@ accurate and ~20x smaller on disk than the forest here.
 
 import json
 import logging
+from typing import Any
 
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
 from sklearn.inspection import permutation_importance
@@ -65,14 +67,14 @@ TEMPORAL_CUTOFF = "2025-01-01"
 OPENMP_THREADS = 4
 
 
-def load_data():
+def load_data() -> pd.DataFrame:
     df = pd.read_csv(PROC_DIR / "sales_clean.csv")
     for c in BOOLEAN_FEATURES:
         df[c] = df[c].astype(int)
     return df
 
 
-def build_pipeline(model):
+def build_pipeline(model: BaseEstimator) -> Pipeline:
     pre = ColumnTransformer(
         transformers=[
             ("num", StandardScaler(), NUMERIC_FEATURES + BOOLEAN_FEATURES),
@@ -87,7 +89,7 @@ def build_pipeline(model):
     return Pipeline(steps=[("pre", pre), ("model", model)])
 
 
-def candidate_models():
+def candidate_models() -> dict[str, BaseEstimator]:
     return {
         "LinearRegression": LinearRegression(),
         "RandomForest": RandomForestRegressor(
@@ -108,7 +110,9 @@ def candidate_models():
     }
 
 
-def cross_validate_model(model, X, y, name, folds=CV_FOLDS):
+def cross_validate_model(
+    model: BaseEstimator, X: pd.DataFrame, y: pd.Series, name: str, folds: int = CV_FOLDS
+) -> dict[str, Any]:
     """K-fold CV on the full dataset: a single 80/20 split can be lucky,
     so report mean +/- std across folds to show the score is stable."""
     cv = KFold(n_splits=folds, shuffle=True, random_state=RANDOM_STATE)
@@ -135,7 +139,9 @@ def cross_validate_model(model, X, y, name, folds=CV_FOLDS):
     }
 
 
-def temporal_holdout(model, df, name, cutoff=TEMPORAL_CUTOFF):
+def temporal_holdout(
+    model: BaseEstimator, df: pd.DataFrame, name: str, cutoff: str = TEMPORAL_CUTOFF
+) -> dict[str, Any]:
     """Out-of-time check: train on listings before `cutoff`, test on
     listings after it. Random splits let the model see neighbouring
     months of the same market regime; this asks the harder question of
@@ -150,7 +156,7 @@ def temporal_holdout(model, df, name, cutoff=TEMPORAL_CUTOFF):
     return result
 
 
-def evaluate(pipe, X_test, y_test, name):
+def evaluate(pipe: Pipeline, X_test: pd.DataFrame, y_test: pd.Series, name: str) -> dict[str, Any]:
     preds = pipe.predict(X_test)
     rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
     mae = float(mean_absolute_error(y_test, preds))
@@ -159,7 +165,9 @@ def evaluate(pipe, X_test, y_test, name):
     return {"model": name, "rmse_eur": round(rmse, 0), "mae_eur": round(mae, 0), "r2": round(r2, 4)}
 
 
-def log_top_features(pipe, name, X_test, y_test, top_n=12):
+def log_top_features(
+    pipe: Pipeline, name: str, X_test: pd.DataFrame, y_test: pd.Series, top_n: int = 12
+) -> None:
     """Tree ensembles with impurity importances and linear models with
     coefficients report those directly; anything else (e.g. gradient
     boosting) falls back to permutation importance on the raw columns."""
@@ -194,12 +202,12 @@ def log_top_features(pipe, name, X_test, y_test, top_n=12):
         logger.info(f"    {f:40s} {v:{fmt}}")
 
 
-def run():
+def run() -> dict[str, list[dict[str, Any]]]:
     with threadpool_limits(limits=OPENMP_THREADS, user_api="openmp"):
         return _run()
 
 
-def _run():
+def _run() -> dict[str, list[dict[str, Any]]]:
     df = load_data()
     X = df[NUMERIC_FEATURES + BOOLEAN_FEATURES + CATEGORICAL_FEATURES]
     y = df[TARGET]

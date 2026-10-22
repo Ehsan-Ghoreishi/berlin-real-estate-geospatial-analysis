@@ -15,6 +15,7 @@ Usage:
 import argparse
 import logging
 import time
+from collections.abc import Callable, Sequence
 
 from src import (
     extract,
@@ -28,7 +29,7 @@ from src import (
 
 logger = logging.getLogger(__name__)
 
-STAGES = {
+STAGES: dict[str, Callable[[], object]] = {
     "extract": extract.run,
     "transform": transform.run,
     "load": load.run,
@@ -39,7 +40,7 @@ STAGES = {
 }
 
 
-def run_pipeline(stages=None):
+def run_pipeline(stages: Sequence[str] | None = None) -> None:
     selected = [s for s in STAGES if stages is None or s in stages]
     t0 = time.time()
 
@@ -52,7 +53,7 @@ def run_pipeline(stages=None):
     logger.info(f"Pipeline complete in {time.time() - t0:.1f}s")
 
 
-def parse_args(argv=None):
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Berlin real estate ETL + ML pipeline")
     parser.add_argument(
         "--stages",
