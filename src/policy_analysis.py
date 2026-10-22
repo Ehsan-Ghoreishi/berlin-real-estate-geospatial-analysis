@@ -27,9 +27,7 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
-MAP_DIR = Path(__file__).resolve().parents[1] / "maps"
-MAP_DIR.mkdir(parents=True, exist_ok=True)
+from src.config import MAP_DIR, PROC_DIR, ensure_dirs
 
 EVENTS = [
     ("2020-02", "Mietendeckel enacted"),
@@ -112,6 +110,7 @@ def plot_policy_shock_chart(idx: pd.DataFrame) -> Path:
 
 
 def run():
+    ensure_dirs()
     df = pd.read_csv(PROC_DIR / "kiez_monthly_clean.csv")
     idx = weighted_monthly_index(df)
     idx.to_csv(PROC_DIR / "citywide_monthly_index.csv", index=False)

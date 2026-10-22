@@ -11,12 +11,10 @@ Loads all cleaned tables into a single SQLite database
 """
 
 import sqlite3
-from pathlib import Path
 
 import pandas as pd
 
-PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
-DB_PATH = PROC_DIR / "berlin_real_estate.db"
+from src.config import DB_PATH, PROC_DIR
 
 TABLES = {
     "sales": "sales_clean.csv",

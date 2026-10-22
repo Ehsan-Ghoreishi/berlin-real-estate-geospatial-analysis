@@ -20,9 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
-MAP_DIR = Path(__file__).resolve().parents[1] / "maps"
-MAP_DIR.mkdir(parents=True, exist_ok=True)
+from src.config import MAP_DIR, PROC_DIR, RANDOM_STATE, ensure_dirs
 
 SAMPLE_SIZE = 2000
 
@@ -34,7 +32,7 @@ def price_color(p, lo, hi):
     return f"#{r:02x}{g:02x}00"
 
 
-def stratified_sample(df: pd.DataFrame, n: int, seed=42) -> pd.DataFrame:
+def stratified_sample(df: pd.DataFrame, n: int, seed=RANDOM_STATE) -> pd.DataFrame:
     frac = n / len(df)
     parts = [g.sample(frac=frac, random_state=seed) for _, g in df.groupby("bezirk")]
     return pd.concat(parts, ignore_index=True)
@@ -123,6 +121,7 @@ def build_static_map(sample: pd.DataFrame) -> Path:
 
 
 def run():
+    ensure_dirs()
     sales = pd.read_csv(PROC_DIR / "sales_clean.csv")
     stations = pd.read_csv(PROC_DIR / "stations_clean.csv")
 

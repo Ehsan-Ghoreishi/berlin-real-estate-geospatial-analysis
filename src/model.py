@@ -16,7 +16,6 @@ overfitting risk of a deeper model on this feature set.
 """
 
 import json
-from pathlib import Path
 
 import joblib
 import numpy as np
@@ -29,7 +28,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
+from src.config import METRICS_PATH, MODEL_PATH, PROC_DIR, RANDOM_STATE
 
 NUMERIC_FEATURES = [
     "rooms", "area_m2", "floor", "total_floors", "year_built",
@@ -76,7 +75,7 @@ def run():
     y = df[TARGET]
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=0.2, random_state=RANDOM_STATE
     )
 
     results = []
@@ -88,7 +87,7 @@ def run():
     rf_pipe = build_pipeline(
         RandomForestRegressor(
             n_estimators=150, max_depth=14, min_samples_leaf=5,
-            random_state=42, n_jobs=-1,
+            random_state=RANDOM_STATE, n_jobs=-1,
         )
     )
     rf_pipe.fit(X_train, y_train)
@@ -96,8 +95,8 @@ def run():
 
     best = min(results, key=lambda r: r["rmse_eur"])
     best_pipe = rf_pipe if best["model"] == "RandomForest" else lin_pipe
-    joblib.dump(best_pipe, PROC_DIR / "price_model.joblib", compress=3)
-    model_size_mb = (PROC_DIR / "price_model.joblib").stat().st_size / 1e6
+    joblib.dump(best_pipe, MODEL_PATH, compress=3)
+    model_size_mb = MODEL_PATH.stat().st_size / 1e6
     print(f"[model] best model = {best['model']} -> saved ({model_size_mb:.1f} MB)")
 
     ohe = best_pipe.named_steps["pre"].named_transformers_["cat"]
@@ -117,9 +116,9 @@ def run():
         for f, c in top:
             print(f"    {f:40s} {c:+,.0f}")
 
-    with open(PROC_DIR / "model_metrics.json", "w") as f:
+    with open(METRICS_PATH, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"[model] metrics -> {PROC_DIR/'model_metrics.json'}")
+    print(f"[model] metrics -> {METRICS_PATH}")
     return results
 
 

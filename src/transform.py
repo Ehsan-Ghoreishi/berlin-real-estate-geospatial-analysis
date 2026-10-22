@@ -15,8 +15,6 @@ This independent computation serves two purposes:
      show in an interview ("I didn't just trust the source column").
 """
 
-from pathlib import Path
-
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -24,11 +22,7 @@ from geopy.distance import geodesic
 from scipy.spatial import cKDTree
 from shapely.geometry import Point
 
-RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw"
-PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
-PROC_DIR.mkdir(parents=True, exist_ok=True)
-
-BRANDENBURG_GATE = (52.5163, 13.3777)
+from src.config import METRIC_CRS, PROC_DIR, RAW_DIR, WGS84_CRS, ensure_dirs
 
 
 def load_raw():
@@ -56,13 +50,13 @@ def nearest_station_kdtree(listings: pd.DataFrame, stations: pd.DataFrame) -> pd
     the original prototype, brute force would be too slow at this scale)."""
     listings_gdf = gpd.GeoDataFrame(
         listings, geometry=gpd.points_from_xy(listings["lon"], listings["lat"]),
-        crs="EPSG:4326",
-    ).to_crs(epsg=25833)  # ETRS89 / UTM zone 33N -- correct metric CRS for Berlin
+        crs=WGS84_CRS,
+    ).to_crs(epsg=METRIC_CRS)  # ETRS89 / UTM zone 33N -- correct metric CRS for Berlin
 
     stations_gdf = gpd.GeoDataFrame(
         stations, geometry=gpd.points_from_xy(stations["lon"], stations["lat"]),
-        crs="EPSG:4326",
-    ).to_crs(epsg=25833)
+        crs=WGS84_CRS,
+    ).to_crs(epsg=METRIC_CRS)
 
     station_coords = np.column_stack([stations_gdf.geometry.x, stations_gdf.geometry.y])
     listing_coords = np.column_stack([listings_gdf.geometry.x, listings_gdf.geometry.y])
@@ -124,6 +118,7 @@ def validate_distance_columns(sales: pd.DataFrame):
 
 
 def run():
+    ensure_dirs()
     sales, rentals, new_build, kiez_monthly, stations = load_raw()
 
     sales = clean_sales(sales, stations)
@@ -144,7 +139,7 @@ def run():
 
     # GeoPackage for the flagship sales table (GIS-ready artifact)
     gdf = gpd.GeoDataFrame(
-        sales, geometry=gpd.points_from_xy(sales["lon"], sales["lat"]), crs="EPSG:4326"
+        sales, geometry=gpd.points_from_xy(sales["lon"], sales["lat"]), crs=WGS84_CRS
     )
     gdf.to_file(PROC_DIR / "sales_clean.gpkg", driver="GPKG", layer="sales")
     print(f"[transform] wrote GeoPackage -> {PROC_DIR/'sales_clean.gpkg'}")

@@ -26,11 +26,9 @@ the expected shape/columns -- no network fetch needed, they're already
 downloaded to data/raw/.
 """
 
-from pathlib import Path
-
 import pandas as pd
 
-RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw"
+from src.config import RAW_DIR
 
 EXPECTED = {
     "secondary_sales.csv": 50000,
