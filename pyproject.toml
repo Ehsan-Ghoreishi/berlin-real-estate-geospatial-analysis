@@ -1,0 +1,24 @@
+[project]
+name = "berlin-real-estate"
+version = "0.2.0"
+description = "Berlin housing market ETL, geospatial feature engineering, price modelling and policy-shock analysis"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Ehsan Ghoreishi" }]
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "NPY"]
+# matplotlib.use("Agg") must run before pyplot is imported
+ignore = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
