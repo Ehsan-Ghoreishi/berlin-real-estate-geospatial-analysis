@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Berlin Real Estate — Geospatial ML & Policy-Shock Analysis"
+abstract: >-
+  End-to-end ETL, geospatial feature engineering, price modelling and
+  policy-shock / rental-yield analysis of the Berlin housing market, 2020-2026.
+type: software
+authors:
+  - family-names: Ghoreishi
+    given-names: Ehsan
+repository-code: "https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis"
+url: "https://ehsan-ghoreishi.github.io/berlin-real-estate-geospatial-analysis/"
+license: MIT
+version: 0.3.0
+date-released: "2026-10-22"
+keywords:
+  - berlin
+  - real-estate
+  - geospatial
+  - machine-learning
+  - geopandas
+  - scikit-learn
+references:
+  - type: data
+    title: "Berlin Real Estate: Sales & Rentals 2020-2026"
+    authors:
+      - name: Sergey Nefedov
+    url: "https://www.kaggle.com/datasets/sergionefedov/berlin-real-estate-sales-and-rentals-2020-2026"
+    license: Apache-2.0
