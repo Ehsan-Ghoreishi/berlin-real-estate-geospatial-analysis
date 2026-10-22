@@ -1,24 +1,72 @@
-# Berlin Real Estate — Policy-Shock ETL, Geospatial ML & Price Prediction
+<h1 align="center">Berlin Real Estate — Geospatial ML & Policy-Shock Analysis</h1>
 
-[![CI](https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<p align="center">
+  An end-to-end, tested and containerised data pipeline for the Berlin housing market (2020–2026):<br>
+  ETL → geospatial feature engineering → SQL → price prediction → policy &amp; yield analysis → maps.
+</p>
 
-An end-to-end ETL pipeline and geospatial/time-series analysis of the Berlin
-housing market (2020–2026): raw data → cleaning → geospatial feature
-engineering → SQL storage → price prediction → policy-shock timeline →
-buy-vs-rent yield analysis → interactive map.
+<p align="center">
+  <a href="https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis/actions/workflows/ci.yml"><img src="https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/code%20style-ruff-261230" alt="ruff">
+  <img src="https://img.shields.io/badge/types-mypy-2a6db2" alt="mypy">
+  <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"></a>
+</p>
 
-![policy shock timeline](maps/policy_shock_timeline.png)
-![rental yield](maps/rental_yield_by_ortsteil.png)
-![static map](maps/berlin_prices_static.png)
+<p align="center">
+  <a href="https://ehsan-ghoreishi.github.io/berlin-real-estate-geospatial-analysis/"><b>Project page</b></a> ·
+  <a href="https://ehsan-ghoreishi.github.io/berlin-real-estate-geospatial-analysis/maps/berlin_prices_interactive.html"><b>Live interactive map</b></a> ·
+  <a href="notebooks/berlin_market_analysis.ipynb"><b>Analysis notebook</b></a> ·
+  <a href="#results"><b>Results</b></a>
+</p>
 
-## Pipeline
+![Berlin housing market 2020–2026: sales, rent and ECB rate with policy shocks](maps/policy_shock_timeline.png)
 
+## At a glance
+
+| | |
+|---|---|
+| **Data** | ~89,000 Berlin listings (sales, rentals, new builds) + 82-Ortsteil monthly series + 135 real transit stations |
+| **Best model** | Gradient boosting, **R² 0.940**, RMSE €57k: stable under 5-fold CV (±0.002) and on an unseen 2025–26 period (0.939) |
+| **Geospatial** | Nearest-station distance computed independently with a KD-tree in EPSG:25833, validated against the source (r = 0.74) |
+| **Policy shocks** | Rents +10.5% in the 6 months after the Mietendeckel was struck down; sales trough during the 2023 ECB hike cycle |
+| **Buy vs rent** | Gross yield ranges 3.6% → 5.0% across Ortsteile; a data-quality check caught a generator artifact in the source series |
+| **Engineering** | CLI pipeline, 21 pytest tests, ruff + mypy, pre-commit, GitHub Actions, Docker, reproducible seeds |
+
+**Tech stack:** Python · pandas · GeoPandas · SciPy · scikit-learn · SQLite · Folium · Matplotlib · pytest · Docker · GitHub Actions
+
+<details>
+<summary><b>Contents</b></summary>
+
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Dataset](#dataset)
+- [What each stage does](#what-each-stage-does)
+- [Results](#results)
+- [Design decisions](#design-decisions)
+- [Project structure](#project-structure)
+
+</details>
+
+## Architecture
+
+```mermaid
+flowchart LR
+    raw[("Kaggle CSVs<br/>data/raw")] --> E[extract<br/>schema checks]
+    E --> T[transform<br/>cleaning + KD-tree<br/>station distance]
+    T --> L[(load<br/>SQLite)]
+    T --> M[model<br/>LR · RF · GBM<br/>CV + out-of-time]
+    T --> P[policy_analysis<br/>weighted index]
+    T --> Y[yield_analysis<br/>buy vs rent]
+    T --> V[visualize<br/>Folium + static]
+    M --> out1[/metrics.json<br/>model.joblib/]
+    P --> out2[/charts/]
+    Y --> out2
+    V --> out3[/interactive map/]
 ```
-extract → transform → load → model → policy_analysis → yield_analysis → visualize
-```
+
+## Quick start
 
 ```bash
 make install        # or: pip install -r requirements.txt
@@ -28,7 +76,7 @@ python3 main.py --list                     # list stages
 python3 main.py --stages model visualize   # run a subset, in pipeline order
 ```
 
-Outputs land in `data/processed/` and `maps/`. A full run takes ~20s on
+Outputs land in `data/processed/` and `maps/`. A full run takes under a minute on
 ~89,000 combined listings. All seeds are fixed in `src/config.py`, so the
 CSV outputs are reproducible run to run.
 
@@ -98,6 +146,15 @@ transaction.
 
 **Price prediction (secondary market, n=49,000 after cleaning):**
 
+| Model | Random holdout R² | 5-fold CV R² | Out-of-time R² (2025+) | Holdout RMSE (€) |
+|---|---|---|---|---|
+| Linear Regression | 0.820 | 0.820 ± 0.002 | 0.823 | 99,186 |
+| Random Forest | 0.891 | 0.888 ± 0.004 | 0.888 | 77,081 |
+| **Gradient Boosting** | **0.940** | **0.939 ± 0.002** | **0.939** | **57,250** |
+
+<details>
+<summary>Full metrics (RMSE / MAE per evaluation view)</summary>
+
 | Model | Evaluation | RMSE (€) | MAE (€) | R² |
 |---|---|---|---|---|
 | Linear Regression | random 80/20 holdout | 99,186 | 68,061 | 0.820 |
@@ -106,9 +163,11 @@ transaction.
 | Random Forest | random 80/20 holdout | 77,081 | 49,908 | 0.891 |
 | Random Forest | 5-fold CV (mean ± std) | 78,184 ± 1,575 | — | 0.888 ± 0.004 |
 | Random Forest | out-of-time (2025+) | 81,902 | 51,886 | 0.888 |
-| **Gradient Boosting** | random 80/20 holdout | **57,250** | **35,602** | **0.940** |
+| Gradient Boosting | random 80/20 holdout | 57,250 | 35,602 | 0.940 |
 | Gradient Boosting | 5-fold CV (mean ± std) | 57,586 ± 1,082 | — | 0.939 ± 0.002 |
 | Gradient Boosting | out-of-time (2025+) | 60,450 | 37,354 | 0.939 |
+
+</details>
 
 The CV spread is small, so the holdout score isn't a lucky split. On the
 out-of-time test, RMSE rises ~6% (the model has never seen the 2025–26
@@ -143,6 +202,9 @@ condition (0.08), energy class (0.05), and the computed transit distance
   recovering as the ECB began cutting in mid-2024.
 
 **Buy-vs-rent yield** (from `yield_analysis.py`):
+
+![Gross rental yield: citywide over time and by Ortsteil](maps/rental_yield_by_ortsteil.png)
+
 - Citywide gross yield bottomed at 2.76% (Feb 2021, zero-rate era) and
   rose to ~3.6–3.8% by 2026, moving up alongside the 2022–23 ECB hike cycle.
 - Across 82 Ortsteile (last 12 months, listing medians), gross yield
@@ -153,6 +215,12 @@ condition (0.08), energy class (0.05), and the computed transit distance
   *same* rent/price ratio in every Ortsteil (cross-sectional std ≈
   0.0008 pp), i.e. the generator derives Kiez rent from Kiez price. The
   per-Ortsteil ranking therefore uses the listing-level tables instead.
+
+**Spatial price structure** — median €/m² differs ~3× between Bezirke
+(Friedrichshain-Kreuzberg €6,076 vs Marzahn-Hellersdorf €2,023).
+[Open the interactive map →](https://ehsan-ghoreishi.github.io/berlin-real-estate-geospatial-analysis/maps/berlin_prices_interactive.html)
+
+<p align="center"><img src="maps/berlin_prices_static.png" width="560" alt="Berlin sales coloured by EUR per m2"></p>
 
 ## Design decisions
 
@@ -205,7 +273,8 @@ berlin_real_estate/
 │   └── visualize.py
 ├── notebooks/           # executed analysis walkthrough
 ├── tests/               # pytest suite
-├── .github/workflows/   # CI
+├── site/                # GitHub Pages landing page
+├── .github/             # CI, Pages deploy, templates, Dependabot
 ├── data/
 │   ├── raw/          # Kaggle source CSVs
 │   └── processed/    # cleaned tables + metrics (DB, model, gpkg are rebuilt by `make run`)
@@ -218,6 +287,13 @@ berlin_real_estate/
 - Publish the policy-shock notebook on Kaggle against the original
   dataset, crediting the source.
 
-## License
+## License & citation
 
 Code: [MIT](LICENSE). Data: Apache 2.0, © Sergey Nefedov (see the Kaggle page).
+If you use this work, see [`CITATION.cff`](CITATION.cff) (GitHub's “Cite this repository” button).
+
+## Author
+
+**Ehsan Ghoreishi** — [GitHub](https://github.com/Ehsan-Ghoreishi)
+
+Contributions and issues are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
