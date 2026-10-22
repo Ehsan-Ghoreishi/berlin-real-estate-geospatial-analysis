@@ -45,6 +45,7 @@ CATEGORICAL_FEATURES = [
 BOOLEAN_FEATURES = ["has_lift", "has_balcony", "has_cellar", "has_parking"]
 TARGET = "price_eur"
 CV_FOLDS = 5
+TEMPORAL_CUTOFF = "2025-01-01"
 
 
 def load_data():
@@ -95,6 +96,21 @@ def cross_validate_model(model, X, y, name, folds=CV_FOLDS):
     }
 
 
+def temporal_holdout(model, df, name, cutoff=TEMPORAL_CUTOFF):
+    """Out-of-time check: train on listings before `cutoff`, test on
+    listings after it. Random splits let the model see neighbouring
+    months of the same market regime; this asks the harder question of
+    how well it extrapolates into a period it has never seen."""
+    dates = pd.to_datetime(df["date_listed"])
+    train, test = df[dates < cutoff], df[dates >= cutoff]
+    features = NUMERIC_FEATURES + BOOLEAN_FEATURES + CATEGORICAL_FEATURES
+    pipe = build_pipeline(model)
+    pipe.fit(train[features], train[TARGET])
+    result = evaluate(pipe, test[features], test[TARGET], f"{name} (t>={cutoff[:4]})")
+    result.update(model=name, cutoff=cutoff, n_train=len(train), n_test=len(test))
+    return result
+
+
 def evaluate(pipe, X_test, y_test, name):
     preds = pipe.predict(X_test)
     rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
@@ -113,13 +129,14 @@ def run():
         X, y, test_size=0.2, random_state=RANDOM_STATE
     )
 
-    results, cv_results, fitted = [], [], {}
+    results, cv_results, temporal_results, fitted = [], [], [], {}
     for name, estimator in candidate_models().items():
         pipe = build_pipeline(estimator)
         pipe.fit(X_train, y_train)
         fitted[name] = pipe
         results.append(evaluate(pipe, X_test, y_test, name))
         cv_results.append(cross_validate_model(estimator, X, y, name))
+        temporal_results.append(temporal_holdout(estimator, df, name))
 
     best = min(results, key=lambda r: r["rmse_eur"])
     best_pipe = fitted[best["model"]]
@@ -145,9 +162,11 @@ def run():
             logger.info(f"    {f:40s} {c:+,.0f}")
 
     with open(METRICS_PATH, "w") as f:
-        json.dump({"holdout": results, "cross_validation": cv_results}, f, indent=2)
+        json.dump({"holdout": results, "cross_validation": cv_results,
+               "temporal_holdout": temporal_results}, f, indent=2)
     logger.info(f"metrics -> {METRICS_PATH}")
-    return {"holdout": results, "cross_validation": cv_results}
+    return {"holdout": results, "cross_validation": cv_results,
+               "temporal_holdout": temporal_results}
 
 
 if __name__ == "__main__":
