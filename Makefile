@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint typecheck format test run tune notebook docker-build docker-run clean
+.PHONY: help install install-dev lint typecheck format test run tune notebook docker-build docker-run site clean
 
 PYTHON ?= python3
 
@@ -41,6 +41,10 @@ docker-build:  ## Build the pipeline image
 docker-run:  ## Run the full pipeline in Docker, writing outputs to the host
 	docker run --rm -v "$(CURDIR)/data/processed:/app/data/processed" -v "$(CURDIR)/maps:/app/maps" berlin-real-estate
 
+site:  ## Preview the GitHub Pages landing page at http://localhost:8000
+	rm -rf _site && mkdir -p _site && cp -r site/. _site/ && cp -r maps _site/maps
+	cd _site && $(PYTHON) -m http.server 8000
+
 clean:  ## Remove caches
-	rm -rf .pytest_cache .ruff_cache
+	rm -rf .pytest_cache .ruff_cache _site
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

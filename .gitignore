@@ -22,3 +22,4 @@ htmlcov/
 data/processed/berlin_real_estate.db
 data/processed/price_model.joblib
 data/processed/*.gpkg
+_site/

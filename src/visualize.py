@@ -14,12 +14,17 @@ without a multi-hundred-MB HTML file.
 import logging
 from pathlib import Path
 
+import branca.colormap as bcm
 import folium
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+import xyzservices.providers as xyz
+from matplotlib import colormaps
+from matplotlib.colors import to_hex
 
 from src.config import MAP_DIR, PROC_DIR, RANDOM_STATE, WGS84_CRS, ensure_dirs
 
@@ -27,12 +32,18 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_SIZE = 2000
 
+# CARTO basemaps now require an API key (tiles render as "API KEY
+# REQUIRED"), so use Esri's keyless light-gray canvas; OpenStreetMap is
+# offered as a second, labelled layer on the interactive map.
+BASEMAP = xyz.Esri.WorldGrayCanvas
+
+# same diverging palette on both maps: green = cheap, red = expensive
+CMAP = colormaps["RdYlGn_r"]
+
 
 def price_color(p: float, lo: float, hi: float) -> str:
     t = 0.0 if hi == lo else max(0.0, min(1.0, (p - lo) / (hi - lo)))
-    r = int(255 * t)
-    g = int(255 * (1 - t))
-    return f"#{r:02x}{g:02x}00"
+    return to_hex(CMAP(t))
 
 
 def stratified_sample(df: pd.DataFrame, n: int, seed: int = RANDOM_STATE) -> pd.DataFrame:
@@ -42,9 +53,19 @@ def stratified_sample(df: pd.DataFrame, n: int, seed: int = RANDOM_STATE) -> pd.
 
 
 def build_interactive_map(sample: pd.DataFrame, stations: pd.DataFrame) -> Path:
-    m = folium.Map(location=[52.52, 13.405], zoom_start=11, tiles="cartodbpositron")
+    m = folium.Map(location=[52.52, 13.405], zoom_start=11, tiles=None)
+    # Leaflet shows the last base layer added, so the default goes last
+    folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
+    folium.TileLayer(BASEMAP, name="Light gray (Esri)").add_to(m)
 
     lo, hi = sample["price_per_m2_eur"].quantile([0.05, 0.95])
+    legend = bcm.LinearColormap(
+        [to_hex(CMAP(t)) for t in np.linspace(0, 1, 9)],
+        vmin=lo,
+        vmax=hi,
+        caption="Sale price, EUR / m² (5th–95th percentile)",
+    )
+    legend.add_to(m)
 
     listings_fg = folium.FeatureGroup(name=f"Sales listings (n={len(sample):,} sample)")
     for _, r in sample.iterrows():
@@ -53,8 +74,8 @@ def build_interactive_map(sample: pd.DataFrame, stations: pd.DataFrame) -> Path:
             radius=4,
             color=price_color(r["price_per_m2_eur"], lo, hi),
             fill=True,
-            fill_opacity=0.75,
-            weight=0.5,
+            fill_opacity=0.8,
+            weight=0.6,
             popup=(
                 f"{r['ortsteil']}, {r['bezirk']}<br>"
                 f"{r['area_m2']} m2, {r['rooms']} rooms, built {r['year_built']}<br>"
@@ -105,7 +126,7 @@ def build_static_map(sample: pd.DataFrame) -> Path:
             s=8,
             alpha=0.7,
         )
-        cx.add_basemap(ax, source=cx.providers.CartoDB.Positron, timeout=3)
+        cx.add_basemap(ax, source=BASEMAP, timeout=3)
         ax.set_axis_off()
         basemap_ok = True
     except Exception as e:
