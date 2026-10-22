@@ -25,7 +25,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -44,6 +44,7 @@ CATEGORICAL_FEATURES = [
 ]
 BOOLEAN_FEATURES = ["has_lift", "has_balcony", "has_cellar", "has_parking"]
 TARGET = "price_eur"
+CV_FOLDS = 5
 
 
 def load_data():
@@ -61,6 +62,37 @@ def build_pipeline(model):
         ]
     )
     return Pipeline(steps=[("pre", pre), ("model", model)])
+
+
+def candidate_models():
+    return {
+        "LinearRegression": LinearRegression(),
+        "RandomForest": RandomForestRegressor(
+            n_estimators=150, max_depth=14, min_samples_leaf=5,
+            random_state=RANDOM_STATE, n_jobs=-1,
+        ),
+    }
+
+
+def cross_validate_model(model, X, y, name, folds=CV_FOLDS):
+    """K-fold CV on the full dataset: a single 80/20 split can be lucky,
+    so report mean +/- std across folds to show the score is stable."""
+    cv = KFold(n_splits=folds, shuffle=True, random_state=RANDOM_STATE)
+    scores = cross_validate(
+        build_pipeline(model), X, y, cv=cv,
+        scoring={"rmse": "neg_root_mean_squared_error", "r2": "r2"},
+    )
+    rmse = -scores["test_rmse"]
+    r2 = scores["test_r2"]
+    logger.info(f"{name:18s} {folds}-fold CV  RMSE={rmse.mean():>10,.0f} "
+                f"+/- {rmse.std():,.0f} EUR  R2={r2.mean():.3f} +/- {r2.std():.3f}")
+    return {
+        "model": name, "folds": folds,
+        "rmse_eur_mean": round(float(rmse.mean()), 0),
+        "rmse_eur_std": round(float(rmse.std()), 0),
+        "r2_mean": round(float(r2.mean()), 4),
+        "r2_std": round(float(r2.std()), 4),
+    }
 
 
 def evaluate(pipe, X_test, y_test, name):
@@ -81,23 +113,16 @@ def run():
         X, y, test_size=0.2, random_state=RANDOM_STATE
     )
 
-    results = []
-
-    lin_pipe = build_pipeline(LinearRegression())
-    lin_pipe.fit(X_train, y_train)
-    results.append(evaluate(lin_pipe, X_test, y_test, "LinearRegression"))
-
-    rf_pipe = build_pipeline(
-        RandomForestRegressor(
-            n_estimators=150, max_depth=14, min_samples_leaf=5,
-            random_state=RANDOM_STATE, n_jobs=-1,
-        )
-    )
-    rf_pipe.fit(X_train, y_train)
-    results.append(evaluate(rf_pipe, X_test, y_test, "RandomForest"))
+    results, cv_results, fitted = [], [], {}
+    for name, estimator in candidate_models().items():
+        pipe = build_pipeline(estimator)
+        pipe.fit(X_train, y_train)
+        fitted[name] = pipe
+        results.append(evaluate(pipe, X_test, y_test, name))
+        cv_results.append(cross_validate_model(estimator, X, y, name))
 
     best = min(results, key=lambda r: r["rmse_eur"])
-    best_pipe = rf_pipe if best["model"] == "RandomForest" else lin_pipe
+    best_pipe = fitted[best["model"]]
     joblib.dump(best_pipe, MODEL_PATH, compress=3)
     model_size_mb = MODEL_PATH.stat().st_size / 1e6
     logger.info(f"best model = {best['model']} -> saved ({model_size_mb:.1f} MB)")
@@ -120,9 +145,9 @@ def run():
             logger.info(f"    {f:40s} {c:+,.0f}")
 
     with open(METRICS_PATH, "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump({"holdout": results, "cross_validation": cv_results}, f, indent=2)
     logger.info(f"metrics -> {METRICS_PATH}")
-    return results
+    return {"holdout": results, "cross_validation": cv_results}
 
 
 if __name__ == "__main__":
