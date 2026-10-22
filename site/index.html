@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Berlin Real Estate Analysis</title>
+  <meta name="description" content="End-to-end geospatial ML and policy-shock analysis of the Berlin housing market, 2020–2026.">
+  <meta property="og:title" content="Berlin Real Estate — Geospatial ML & Policy-Shock Analysis">
+  <meta property="og:description" content="~89k listings, KD-tree transit features, gradient boosting (R² 0.94), policy shocks and buy-vs-rent yields.">
+  <meta property="og:image" content="maps/policy_shock_timeline.png">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232563eb'/><path d='M8 23V14l8-6 8 6v9h-5v-6h-6v6z' fill='white'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --text: #111827;
+      --muted: #5b6474;
+      --border: #e3e6eb;
+      --accent: #2563eb;
+      --accent-soft: #e8efff;
+      --good: #15803d;
+      --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 4px 16px rgba(16, 24, 40, .06);
+      --radius: 14px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --text: #e6edf3;
+        --muted: #9aa4b2;
+        --border: #2a313c;
+        --accent: #6ea8ff;
+        --accent-soft: #1b2a44;
+        --good: #4ade80;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+      }
+      .figure img { background: #fff; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .88em; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+
+    header.hero { padding: 72px 0 40px; }
+    .eyebrow { color: var(--accent); font-weight: 600; font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.12; margin: 10px 0 16px; letter-spacing: -.02em; }
+    .lede { font-size: 1.15rem; color: var(--muted); max-width: 720px; margin: 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px;
+      border-radius: 10px; font-weight: 600; font-size: .95rem; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+    }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn:hover { text-decoration: none; filter: brightness(1.05); }
+
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 8px 0 56px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+    .stat .value { font-size: 1.9rem; font-weight: 700; letter-spacing: -.02em; }
+    .stat .label { color: var(--muted); font-size: .9rem; }
+
+    section { margin: 0 0 64px; }
+    h2 { font-size: 1.6rem; letter-spacing: -.01em; margin: 0 0 6px; }
+    .sub { color: var(--muted); margin: 0 0 22px; max-width: 760px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .map-frame { width: 100%; height: 520px; border: 0; display: block; }
+    .card-foot { padding: 12px 18px; color: var(--muted); font-size: .9rem; border-top: 1px solid var(--border); }
+
+    .figure { margin: 0; }
+    .figure img { width: 100%; display: block; }
+    .figure figcaption { padding: 14px 18px; color: var(--muted); font-size: .93rem; border-top: 1px solid var(--border); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .finding { padding: 20px 22px; }
+    .finding h3 { margin: 0 0 6px; font-size: 1.05rem; }
+    .finding p { margin: 0; color: var(--muted); }
+    .finding .num { color: var(--good); font-weight: 700; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    th, td { text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+    td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.best td { font-weight: 600; background: var(--accent-soft); }
+    tr:last-child td { border-bottom: 0; }
+    .table-scroll { overflow-x: auto; }
+
+    .steps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; counter-reset: step; }
+    .step { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: .88rem; }
+    .step b { display: block; font-family: "JetBrains Mono", monospace; font-size: .82rem; color: var(--accent); margin-bottom: 4px; }
+    .step span { color: var(--muted); }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag { padding: 5px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: .85rem; font-weight: 500; }
+
+    footer { border-top: 1px solid var(--border); padding: 28px 0 48px; color: var(--muted); font-size: .9rem; }
+    footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+
+    @media (max-width: 900px) {
+      .steps { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 760px) {
+      header.hero { padding: 48px 0 28px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+      .map-frame { height: 420px; }
+      th, td { padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="eyebrow">Data engineering · Geospatial ML · Housing economics</div>
+      <h1>Berlin Real Estate,<br>2020–2026</h1>
+      <p class="lede">An end-to-end, tested and containerised pipeline that turns ~89,000 Berlin listings into
+        geospatial features, a price model, a policy-shock timeline and a buy-vs-rent comparison across 82 Ortsteile.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis">View on GitHub</a>
+        <a class="btn" href="maps/berlin_prices_interactive.html">Open full-screen map</a>
+        <a class="btn" href="https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis/blob/main/notebooks/berlin_market_analysis.ipynb">Analysis notebook</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="stats">
+      <div class="stat"><div class="value">0.940</div><div class="label">R² of the gradient-boosting price model</div></div>
+      <div class="stat"><div class="value">89k</div><div class="label">sales, rental and new-build listings</div></div>
+      <div class="stat"><div class="value">82</div><div class="label">Ortsteile in the monthly series</div></div>
+      <div class="stat"><div class="value">135</div><div class="label">real U-/S-Bahn stations matched with a KD-tree</div></div>
+    </div>
+
+    <section>
+      <h2>Where Berlin is expensive</h2>
+      <p class="sub">A stratified sample of 2,000 sales coloured by €/m², with all 135 transit stations as a toggleable layer. Click a dot for the listing and its nearest station.</p>
+      <div class="card">
+        <iframe class="map-frame" src="maps/berlin_prices_interactive.html" title="Interactive map of Berlin sale prices" loading="lazy"></iframe>
+        <div class="card-foot">Median €/m² differs about 3× between Bezirke: Friedrichshain-Kreuzberg €6,076 vs Marzahn-Hellersdorf €2,023.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Policy shocks and interest rates</h2>
+      <p class="sub">A listing-count-weighted citywide index, overlaid with the ECB rate and seven real policy and macro events.</p>
+      <figure class="card figure">
+        <img src="maps/policy_shock_timeline.png" alt="Berlin sales and rent per m2 versus the ECB rate, 2020 to 2026, with policy events marked" loading="lazy">
+        <figcaption>Sales, rent and the ECB rate, with the Mietendeckel, the Ukraine war, the energy crisis, the Heizungsgesetz and ECB turning points marked.</figcaption>
+      </figure>
+      <div class="grid-2" style="margin-top:18px">
+        <div class="card finding">
+          <h3>Rent freeze released</h3>
+          <p>Average Kaltmiete rose <span class="num">+10.5%</span> in the six months after the Constitutional Court struck down the Mietendeckel (April 2021).</p>
+        </div>
+        <div class="card finding">
+          <h3>Rate-hike trough</h3>
+          <p>Sales prices bottomed at <span class="num">€5,145/m²</span> in August 2023, as the ECB rate approached its 4.50% peak, then recovered once cuts began.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Buy or rent?</h2>
+      <p class="sub">Gross rental yield, citywide over time and per Ortsteil (listing medians, last 12 months).</p>
+      <figure class="card figure">
+        <img src="maps/rental_yield_by_ortsteil.png" alt="Gross rental yield over time and the highest and lowest yielding Ortsteile" loading="lazy">
+        <figcaption>Yields range from 3.6% (Tempelhof) to 5.0% (Müggelheim). A built-in data-quality check showed the source's monthly Kiez series uses a single citywide rent/price ratio, so the ranking uses listing-level data instead.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>Price model</h2>
+      <p class="sub">Predicting secondary-market sale price from structure, building quality, location and macro features. Each model is evaluated three ways, including an out-of-time test on 2025–26 listings it never saw.</p>
+      <div class="card table-scroll">
+        <table>
+          <thead>
+            <tr><th>Model</th><th class="n">Holdout R²</th><th class="n">5-fold CV R²</th><th class="n">Out-of-time R²</th><th class="n">RMSE (€)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Linear Regression</td><td class="n">0.820</td><td class="n">0.820 ± 0.002</td><td class="n">0.823</td><td class="n">99,186</td></tr>
+            <tr><td>Random Forest</td><td class="n">0.891</td><td class="n">0.888 ± 0.004</td><td class="n">0.888</td><td class="n">77,081</td></tr>
+            <tr class="best"><td>Gradient Boosting</td><td class="n">0.940</td><td class="n">0.939 ± 0.002</td><td class="n">0.939</td><td class="n">57,250</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Pipeline</h2>
+      <p class="sub">Seven stages, each runnable on its own: <code>python3 main.py --stages model</code>.</p>
+      <div class="steps">
+        <div class="step"><b>extract</b><span>schema &amp; row-count checks</span></div>
+        <div class="step"><b>transform</b><span>cleaning, KD-tree station distance in EPSG:25833</span></div>
+        <div class="step"><b>load</b><span>indexed SQLite database</span></div>
+        <div class="step"><b>model</b><span>LR · RF · GBM, CV + out-of-time</span></div>
+        <div class="step"><b>policy</b><span>weighted index + events</span></div>
+        <div class="step"><b>yield</b><span>buy-vs-rent by Ortsteil</span></div>
+        <div class="step"><b>visualize</b><span>Folium + static maps</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Built with</h2>
+      <div class="tags">
+        <span class="tag">Python</span><span class="tag">pandas</span><span class="tag">GeoPandas</span>
+        <span class="tag">SciPy KD-tree</span><span class="tag">scikit-learn</span><span class="tag">SQLite</span>
+        <span class="tag">Folium</span><span class="tag">Matplotlib</span><span class="tag">pytest</span>
+        <span class="tag">ruff · mypy</span><span class="tag">Docker</span><span class="tag">GitHub Actions</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Ehsan Ghoreishi · Code MIT · Data Apache 2.0, Sergey Nefedov (Kaggle)</span>
+      <a href="https://github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis">github.com/Ehsan-Ghoreishi/berlin-real-estate-geospatial-analysis</a>
+    </div>
+  </footer>
+</body>
+</html>
