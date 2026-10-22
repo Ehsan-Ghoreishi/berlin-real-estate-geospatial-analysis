@@ -4,3 +4,4 @@ ruff==0.17.1
 pre-commit==4.7.0
 nbconvert==7.17.0
 ipykernel==7.2.0
+mypy==2.4.0

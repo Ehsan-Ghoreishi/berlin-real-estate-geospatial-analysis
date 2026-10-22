@@ -22,3 +22,11 @@ known-first-party = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "main.py"]
+# pandas/sklearn/geopandas ship without complete type information
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true

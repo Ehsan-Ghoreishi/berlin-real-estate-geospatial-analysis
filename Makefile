@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format test run tune notebook clean
+.PHONY: help install install-dev lint typecheck format test run tune notebook clean
 
 PYTHON ?= python3
 
@@ -15,6 +15,9 @@ install-dev:  ## Install dev dependencies and git hooks
 lint:  ## Run ruff lint and format checks
 	ruff check .
 	ruff format --check .
+
+typecheck:  ## Static type check with mypy
+	mypy
 
 format:  ## Auto-fix lint issues and format code
 	ruff check --fix .

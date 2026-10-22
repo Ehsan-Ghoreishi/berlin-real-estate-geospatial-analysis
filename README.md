@@ -42,9 +42,10 @@ For a guided walkthrough of the results with charts, open
 make install-dev    # dev deps + pre-commit hooks
 make test           # pytest (21 tests)
 make lint           # ruff check + ruff format --check
+make typecheck      # mypy
 ```
 
-CI runs lint and tests on every push and pull request.
+CI runs lint, type checks and tests on every push and pull request.
 
 ## Dataset
 
