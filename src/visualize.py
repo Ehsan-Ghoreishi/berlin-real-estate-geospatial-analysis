@@ -21,7 +21,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from src.config import MAP_DIR, PROC_DIR, RANDOM_STATE, ensure_dirs
+from src.config import MAP_DIR, PROC_DIR, RANDOM_STATE, WGS84_CRS, ensure_dirs
 
 logger = logging.getLogger(__name__)
 
@@ -91,12 +91,11 @@ def build_static_map(sample: pd.DataFrame) -> Path:
     try:
         import contextily as cx
         import geopandas as gpd
-        from shapely.geometry import Point
 
         gdf = gpd.GeoDataFrame(
             sample,
-            geometry=[Point(xy) for xy in zip(sample["lon"], sample["lat"])],
-            crs="EPSG:4326",
+            geometry=gpd.points_from_xy(sample["lon"], sample["lat"]),
+            crs=WGS84_CRS,
         ).to_crs(epsg=3857)
         sc = ax.scatter(
             gdf.geometry.x,

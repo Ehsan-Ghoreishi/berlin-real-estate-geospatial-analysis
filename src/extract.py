@@ -22,8 +22,8 @@ documentation -- stated here for defensibility in an interview):
     which is why the dataset author built it this way).
 
 This extract stage validates that the five raw CSVs are present, carry
-the columns later stages rely on, and have the expected row counts -- no network fetch needed, they're already
-downloaded to data/raw/.
+the columns later stages rely on, and have the expected row counts -- no
+network fetch needed, they're already downloaded to data/raw/.
 """
 
 import logging

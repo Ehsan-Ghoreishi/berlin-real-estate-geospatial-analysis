@@ -170,13 +170,13 @@ def run():
 
     if best["model"] == "RandomForest":
         importances = best_pipe.named_steps["model"].feature_importances_
-        top = sorted(zip(feat_names, importances), key=lambda t: -t[1])[:12]
+        top = sorted(zip(feat_names, importances, strict=True), key=lambda t: -t[1])[:12]
         logger.info("top feature importances (RandomForest):")
         for f, imp in top:
             logger.info(f"    {f:40s} {imp:.4f}")
     else:
         coefs = best_pipe.named_steps["model"].coef_
-        top = sorted(zip(feat_names, coefs), key=lambda t: -abs(t[1]))[:12]
+        top = sorted(zip(feat_names, coefs, strict=True), key=lambda t: -abs(t[1]))[:12]
         logger.info("top standardized coefficients (LinearRegression):")
         for f, c in top:
             logger.info(f"    {f:40s} {c:+,.0f}")

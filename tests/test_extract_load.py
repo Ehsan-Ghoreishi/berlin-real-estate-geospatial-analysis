@@ -20,7 +20,7 @@ def test_validate_file_warns_on_row_count(caplog):
 
 
 def test_load_writes_tables_and_indexes(tmp_path):
-    for table, fname in load.TABLES.items():
+    for fname in load.TABLES.values():
         pd.DataFrame(
             {
                 "bezirk": ["Mitte", "Pankow"],
