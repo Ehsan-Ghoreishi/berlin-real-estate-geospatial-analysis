@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-10-22
+
+### Added
+- Project landing page (`site/`) deployed to GitHub Pages, with the live map,
+  charts and model comparison; preview with `make site`.
+- Colour legend and a shared RdYlGn palette on the interactive map.
+- `CITATION.cff`, `CONTRIBUTING.md`, issue forms, PR template and Dependabot.
+
+### Changed
+- README reworked: at-a-glance results, architecture diagram, compact metrics.
+
+### Fixed
+- Basemaps rendered as "API KEY REQUIRED" after CARTO started requiring a key;
+  both maps now use Esri's keyless light-gray canvas (OpenStreetMap as an
+  alternative layer).
+
 ## [0.3.0] - 2026-10-22
 
 ### Added
