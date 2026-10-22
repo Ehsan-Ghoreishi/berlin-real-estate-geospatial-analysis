@@ -3,7 +3,8 @@ main.py
 =======
 Runs the full pipeline end to end:
 
-    extract -> transform -> load -> model -> policy_analysis -> visualize
+    extract -> transform -> load -> model -> policy_analysis
+             -> yield_analysis -> visualize
 
 Usage:
     python3 main.py                          # run every stage
@@ -15,7 +16,15 @@ import argparse
 import logging
 import time
 
-from src import extract, load, model, policy_analysis, transform, visualize
+from src import (
+    extract,
+    load,
+    model,
+    policy_analysis,
+    transform,
+    visualize,
+    yield_analysis,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +34,7 @@ STAGES = {
     "load": load.run,
     "model": model.run,
     "policy_analysis": policy_analysis.run,
+    "yield_analysis": yield_analysis.run,
     "visualize": visualize.run,
 }
 
