@@ -1,14 +1,54 @@
-[
-  {
-    "model": "LinearRegression",
-    "rmse_eur": 99186.0,
-    "mae_eur": 68061.0,
-    "r2": 0.8201
-  },
-  {
-    "model": "RandomForest",
-    "rmse_eur": 77081.0,
-    "mae_eur": 49908.0,
-    "r2": 0.8914
-  }
-]
+{
+  "holdout": [
+    {
+      "model": "LinearRegression",
+      "rmse_eur": 99186.0,
+      "mae_eur": 68061.0,
+      "r2": 0.8201
+    },
+    {
+      "model": "RandomForest",
+      "rmse_eur": 77081.0,
+      "mae_eur": 49908.0,
+      "r2": 0.8914
+    }
+  ],
+  "cross_validation": [
+    {
+      "model": "LinearRegression",
+      "folds": 5,
+      "rmse_eur_mean": 98954.0,
+      "rmse_eur_std": 894.0,
+      "r2_mean": 0.8203,
+      "r2_std": 0.0021
+    },
+    {
+      "model": "RandomForest",
+      "folds": 5,
+      "rmse_eur_mean": 78184.0,
+      "rmse_eur_std": 1575.0,
+      "r2_mean": 0.8878,
+      "r2_std": 0.0039
+    }
+  ],
+  "temporal_holdout": [
+    {
+      "model": "LinearRegression",
+      "rmse_eur": 103180.0,
+      "mae_eur": 69203.0,
+      "r2": 0.8228,
+      "cutoff": "2025-01-01",
+      "n_train": 38715,
+      "n_test": 10285
+    },
+    {
+      "model": "RandomForest",
+      "rmse_eur": 81902.0,
+      "mae_eur": 51886.0,
+      "r2": 0.8884,
+      "cutoff": "2025-01-01",
+      "n_train": 38715,
+      "n_test": 10285
+    }
+  ]
+}

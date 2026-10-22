@@ -10,13 +10,16 @@ Loads all cleaned tables into a single SQLite database
   - stations          (135 real transit stations)
 """
 
+import logging
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pandas as pd
 
-PROC_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
-DB_PATH = PROC_DIR / "berlin_real_estate.db"
+from src.config import DB_PATH, PROC_DIR
+
+logger = logging.getLogger(__name__)
 
 TABLES = {
     "sales": "sales_clean.csv",
@@ -27,30 +30,36 @@ TABLES = {
 }
 
 
-def run():
-    conn = sqlite3.connect(DB_PATH)
+INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_sales_bezirk ON sales(bezirk)",
+    "CREATE INDEX IF NOT EXISTS idx_rentals_bezirk ON rentals(bezirk)",
+    "CREATE INDEX IF NOT EXISTS idx_kiez_ortsteil ON kiez_monthly(ortsteil)",
+]
 
-    for table, fname in TABLES.items():
-        df = pd.read_csv(PROC_DIR / fname)
-        df.to_sql(table, conn, if_exists="replace", index=False)
-        print(f"[load] {table:18s} {len(df):>7,} rows -> {DB_PATH.name}")
 
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_sales_bezirk ON sales(bezirk)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_rentals_bezirk ON rentals(bezirk)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_kiez_ortsteil ON kiez_monthly(ortsteil)")
-    conn.commit()
+def run(db_path: Path = DB_PATH, proc_dir: Path = PROC_DIR) -> Path:
+    # closing() guarantees the file handle is released even if a table
+    # fails to load; the inner `with conn` commits or rolls back.
+    with closing(sqlite3.connect(db_path)) as conn:
+        with conn:
+            for table, fname in TABLES.items():
+                df = pd.read_csv(proc_dir / fname)
+                df.to_sql(table, conn, if_exists="replace", index=False)
+                logger.info(f"{table:18s} {len(df):>7,} rows -> {db_path.name}")
+            for stmt in INDEXES:
+                conn.execute(stmt)
 
-    check = pd.read_sql(
-        "SELECT bezirk, COUNT(*) AS n, ROUND(AVG(price_per_m2_eur),0) AS avg_eur_m2 "
-        "FROM sales GROUP BY bezirk ORDER BY avg_eur_m2 DESC",
-        conn,
-    )
-    conn.close()
+        check = pd.read_sql(
+            "SELECT bezirk, COUNT(*) AS n, ROUND(AVG(price_per_m2_eur),0) AS avg_eur_m2 "
+            "FROM sales GROUP BY bezirk ORDER BY avg_eur_m2 DESC",
+            conn,
+        )
 
-    print(f"\n[load] wrote -> {DB_PATH}")
-    print(check.to_string(index=False))
-    return DB_PATH
+    logger.info(f"wrote -> {db_path}")
+    logger.info("average EUR/m2 by Bezirk:\n%s", check.to_string(index=False))
+    return db_path
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()
