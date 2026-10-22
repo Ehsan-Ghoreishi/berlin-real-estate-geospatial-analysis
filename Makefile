@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format test run clean
+.PHONY: help install install-dev lint format test run tune clean
 
 PYTHON ?= python3
 
@@ -25,6 +25,9 @@ test:  ## Run the test suite
 
 run:  ## Run the full pipeline
 	$(PYTHON) main.py
+
+tune:  ## Hyperparameter search for the gradient-boosting model (~3 min)
+	$(PYTHON) -m src.tune
 
 clean:  ## Remove caches
 	rm -rf .pytest_cache .ruff_cache

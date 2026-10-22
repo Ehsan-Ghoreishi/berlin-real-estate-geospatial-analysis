@@ -1,0 +1,25 @@
+{
+  "n_iter": 15,
+  "cv_folds": 3,
+  "best_cv_rmse_eur": 59096.0,
+  "best_params": {
+    "l2_regularization": 0.2975,
+    "learning_rate": 0.0563,
+    "max_features": 0.9916,
+    "max_iter": 704,
+    "max_leaf_nodes": 18,
+    "min_samples_leaf": 55
+  },
+  "holdout_tuned": {
+    "model": "HGB tuned",
+    "rmse_eur": 57739.0,
+    "mae_eur": 36247.0,
+    "r2": 0.9391
+  },
+  "holdout_default": {
+    "model": "HGB default",
+    "rmse_eur": 57250.0,
+    "mae_eur": 35602.0,
+    "r2": 0.9401
+  }
+}
