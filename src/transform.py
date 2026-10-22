@@ -16,12 +16,16 @@ This independent computation serves two purposes:
      show in an interview ("I didn't just trust the source column").
 """
 
+import logging
+
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
 from src.config import METRIC_CRS, PROC_DIR, RAW_DIR, WGS84_CRS, ensure_dirs
+
+logger = logging.getLogger(__name__)
 
 
 def load_raw():
@@ -37,7 +41,7 @@ def clean_percentile(df: pd.DataFrame, col: str, lo_q=0.01, hi_q=0.99) -> pd.Dat
     lo, hi = df[col].quantile([lo_q, hi_q])
     before = len(df)
     df = df[df[col].between(lo, hi)]
-    print(f"[transform] {col}: dropped {before - len(df)} outliers "
+    logger.info(f"{col}: dropped {before - len(df)} outliers "
           f"outside [{lo:,.0f}, {hi:,.0f}]")
     return df
 
@@ -112,7 +116,7 @@ def validate_distance_columns(sales: pd.DataFrame):
     minutes). Prints Pearson correlation as a lightweight data-quality
     signal, not a formal test."""
     corr = sales["computed_dist_nearest_station_km"].corr(sales["transit_distance_min"])
-    print(f"[transform] validation: corr(computed_km, provided_transit_min) = {corr:.3f} "
+    logger.info(f"validation: corr(computed_km, provided_transit_min) = {corr:.3f} "
           f"(expect positive -- further station distance -> longer walk time)")
 
 
@@ -132,17 +136,18 @@ def run():
     kiez_monthly.to_csv(PROC_DIR / "kiez_monthly_clean.csv", index=False)
     stations.to_csv(PROC_DIR / "stations_clean.csv", index=False)
 
-    print(f"[transform] sales:          {len(sales):,} rows")
-    print(f"[transform] rentals:        {len(rentals):,} rows")
-    print(f"[transform] new_construction: {len(new_build):,} rows")
+    logger.info(f"sales:          {len(sales):,} rows")
+    logger.info(f"rentals:        {len(rentals):,} rows")
+    logger.info(f"new_construction: {len(new_build):,} rows")
 
     # GeoPackage for the flagship sales table (GIS-ready artifact)
     gdf = gpd.GeoDataFrame(
         sales, geometry=gpd.points_from_xy(sales["lon"], sales["lat"]), crs=WGS84_CRS
     )
     gdf.to_file(PROC_DIR / "sales_clean.gpkg", driver="GPKG", layer="sales")
-    print(f"[transform] wrote GeoPackage -> {PROC_DIR/'sales_clean.gpkg'}")
+    logger.info(f"wrote GeoPackage -> {PROC_DIR/'sales_clean.gpkg'}")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()

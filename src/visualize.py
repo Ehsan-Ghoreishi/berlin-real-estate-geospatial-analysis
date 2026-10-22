@@ -11,6 +11,7 @@ interactive map draws a stratified sample (proportional per Bezirk) of
 without a multi-hundred-MB HTML file.
 """
 
+import logging
 from pathlib import Path
 
 import folium
@@ -21,6 +22,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from src.config import MAP_DIR, PROC_DIR, RANDOM_STATE, ensure_dirs
+
+logger = logging.getLogger(__name__)
 
 SAMPLE_SIZE = 2000
 
@@ -100,7 +103,7 @@ def build_static_map(sample: pd.DataFrame) -> Path:
         ax.set_axis_off()
         basemap_ok = True
     except Exception as e:
-        print(f"[visualize] basemap tiles unavailable ({type(e).__name__}), falling back")
+        logger.info(f"basemap tiles unavailable ({type(e).__name__}), falling back")
         ax.clear()
 
     if not basemap_ok:
@@ -128,11 +131,12 @@ def run():
     sample = stratified_sample(sales, SAMPLE_SIZE)
 
     html_path = build_interactive_map(sample, stations)
-    print(f"[visualize] wrote interactive map -> {html_path}")
+    logger.info(f"wrote interactive map -> {html_path}")
 
     png_path = build_static_map(sample)
-    print(f"[visualize] wrote static map -> {png_path}")
+    logger.info(f"wrote static map -> {png_path}")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()

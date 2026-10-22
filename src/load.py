@@ -10,11 +10,14 @@ Loads all cleaned tables into a single SQLite database
   - stations          (135 real transit stations)
 """
 
+import logging
 import sqlite3
 
 import pandas as pd
 
 from src.config import DB_PATH, PROC_DIR
+
+logger = logging.getLogger(__name__)
 
 TABLES = {
     "sales": "sales_clean.csv",
@@ -31,7 +34,7 @@ def run():
     for table, fname in TABLES.items():
         df = pd.read_csv(PROC_DIR / fname)
         df.to_sql(table, conn, if_exists="replace", index=False)
-        print(f"[load] {table:18s} {len(df):>7,} rows -> {DB_PATH.name}")
+        logger.info(f"{table:18s} {len(df):>7,} rows -> {DB_PATH.name}")
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sales_bezirk ON sales(bezirk)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_rentals_bezirk ON rentals(bezirk)")
@@ -45,10 +48,11 @@ def run():
     )
     conn.close()
 
-    print(f"\n[load] wrote -> {DB_PATH}")
-    print(check.to_string(index=False))
+    logger.info(f"wrote -> {DB_PATH}")
+    logger.info("average EUR/m2 by Bezirk:\n%s", check.to_string(index=False))
     return DB_PATH
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()

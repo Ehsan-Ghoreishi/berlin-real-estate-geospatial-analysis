@@ -16,6 +16,7 @@ overfitting risk of a deeper model on this feature set.
 """
 
 import json
+import logging
 
 import joblib
 import numpy as np
@@ -29,6 +30,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from src.config import METRICS_PATH, MODEL_PATH, PROC_DIR, RANDOM_STATE
+
+logger = logging.getLogger(__name__)
 
 NUMERIC_FEATURES = [
     "rooms", "area_m2", "floor", "total_floors", "year_built",
@@ -65,7 +68,7 @@ def evaluate(pipe, X_test, y_test, name):
     rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
     mae = float(mean_absolute_error(y_test, preds))
     r2 = float(r2_score(y_test, preds))
-    print(f"[model] {name:18s} RMSE={rmse:>10,.0f} EUR  MAE={mae:>10,.0f} EUR  R2={r2:.3f}")
+    logger.info(f"{name:18s} RMSE={rmse:>10,.0f} EUR  MAE={mae:>10,.0f} EUR  R2={r2:.3f}")
     return {"model": name, "rmse_eur": round(rmse, 0), "mae_eur": round(mae, 0), "r2": round(r2, 4)}
 
 
@@ -97,7 +100,7 @@ def run():
     best_pipe = rf_pipe if best["model"] == "RandomForest" else lin_pipe
     joblib.dump(best_pipe, MODEL_PATH, compress=3)
     model_size_mb = MODEL_PATH.stat().st_size / 1e6
-    print(f"[model] best model = {best['model']} -> saved ({model_size_mb:.1f} MB)")
+    logger.info(f"best model = {best['model']} -> saved ({model_size_mb:.1f} MB)")
 
     ohe = best_pipe.named_steps["pre"].named_transformers_["cat"]
     feat_names = (NUMERIC_FEATURES + BOOLEAN_FEATURES
@@ -106,21 +109,22 @@ def run():
     if best["model"] == "RandomForest":
         importances = best_pipe.named_steps["model"].feature_importances_
         top = sorted(zip(feat_names, importances), key=lambda t: -t[1])[:12]
-        print("[model] top feature importances (RandomForest):")
+        logger.info("top feature importances (RandomForest):")
         for f, imp in top:
-            print(f"    {f:40s} {imp:.4f}")
+            logger.info(f"    {f:40s} {imp:.4f}")
     else:
         coefs = best_pipe.named_steps["model"].coef_
         top = sorted(zip(feat_names, coefs), key=lambda t: -abs(t[1]))[:12]
-        print("[model] top standardized coefficients (LinearRegression):")
+        logger.info("top standardized coefficients (LinearRegression):")
         for f, c in top:
-            print(f"    {f:40s} {c:+,.0f}")
+            logger.info(f"    {f:40s} {c:+,.0f}")
 
     with open(METRICS_PATH, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"[model] metrics -> {METRICS_PATH}")
+    logger.info(f"metrics -> {METRICS_PATH}")
     return results
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()

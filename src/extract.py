@@ -26,9 +26,13 @@ the expected shape/columns -- no network fetch needed, they're already
 downloaded to data/raw/.
 """
 
+import logging
+
 import pandas as pd
 
 from src.config import RAW_DIR
+
+logger = logging.getLogger(__name__)
 
 EXPECTED = {
     "secondary_sales.csv": 50000,
@@ -40,7 +44,7 @@ EXPECTED = {
 
 
 def run():
-    print("[extract] validating raw Kaggle source files")
+    logger.info("validating raw Kaggle source files")
     for fname, expected_rows in EXPECTED.items():
         path = RAW_DIR / fname
         if not path.exists():
@@ -49,9 +53,10 @@ def run():
             )
         df = pd.read_csv(path)
         status = "OK" if len(df) == expected_rows else "ROW COUNT DIFFERS"
-        print(f"    {fname:32s} {len(df):>7,} rows  {status}")
-    print("[extract] all source files present")
+        logger.info(f"    {fname:32s} {len(df):>7,} rows  {status}")
+    logger.info("all source files present")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()

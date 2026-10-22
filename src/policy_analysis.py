@@ -18,6 +18,7 @@ Events plotted (all real, sourced from the dataset documentation):
   2024-06-01  ECB starts cutting rates
 """
 
+import logging
 from pathlib import Path
 
 import matplotlib
@@ -28,6 +29,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from src.config import MAP_DIR, PROC_DIR, ensure_dirs
+
+logger = logging.getLogger(__name__)
 
 EVENTS = [
     ("2020-02", "Mietendeckel enacted"),
@@ -118,8 +121,8 @@ def run():
     # quick printed callouts for the README / write-up
     pre = idx[idx["date"] < "2021-04-15"]["rent_eur_m2"].mean()
     post = idx[(idx["date"] >= "2021-04-15") & (idx["date"] < "2021-10-01")]["rent_eur_m2"].mean()
-    print(f"[policy] avg kaltmiete EUR/m2 before Mietendeckel reversal: {pre:.2f}")
-    print(f"[policy] avg kaltmiete EUR/m2 in 6mo after reversal:        {post:.2f} "
+    logger.info(f"avg kaltmiete EUR/m2 before Mietendeckel reversal: {pre:.2f}")
+    logger.info(f"avg kaltmiete EUR/m2 in 6mo after reversal:        {post:.2f} "
           f"({(post/pre-1)*100:+.1f}%)")
 
     peak_rate_row = idx.loc[idx["ecb_rate_pct"].idxmax()]
@@ -128,13 +131,14 @@ def run():
     # any multi-year growth had accumulated
     cycle_window = idx[(idx["date"] >= "2023-01-01") & (idx["date"] <= "2023-12-31")]
     trough_sales_row = cycle_window.loc[cycle_window["sales_eur_m2"].idxmin()]
-    print(f"[policy] ECB rate peak: {peak_rate_row['ecb_rate_pct']:.2f}% in {peak_rate_row['year_month']}")
-    print(f"[policy] sales price local trough during 2023 rate-hike cycle: "
+    logger.info(f"ECB rate peak: {peak_rate_row['ecb_rate_pct']:.2f}% in {peak_rate_row['year_month']}")
+    logger.info(f"sales price local trough during 2023 rate-hike cycle: "
           f"{trough_sales_row['sales_eur_m2']:.0f} EUR/m2 in {trough_sales_row['year_month']}")
 
     chart_path = plot_policy_shock_chart(idx)
-    print(f"[policy] wrote -> {chart_path}")
+    logger.info(f"wrote -> {chart_path}")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     run()
