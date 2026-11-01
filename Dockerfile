@@ -2,7 +2,7 @@
 #   docker build -t berlin-real-estate .
 #   docker run --rm -v "$PWD/data/processed:/app/data/processed" -v "$PWD/maps:/app/maps" \
 #       berlin-real-estate --stages transform load model
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
